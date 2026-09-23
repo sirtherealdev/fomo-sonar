@@ -92,8 +92,16 @@ npx wrangler deploy
 
 ```bash
 npm run dev:ext                 # loads an unpacked build with hot reload
-npm test -w @scope/extension    # mint-extraction tests
+npm test -w @scope/extension    # address/chain detection tests
 ```
+
+The panel lives in a **closed** shadow root: Fomo's CSS cannot reach in, ours
+cannot leak out, and the host page can neither read nor restyle it. It is
+draggable by its header and remembers where you left it.
+
+Token names and symbols come from third-party indexes, so everything dynamic is
+written with `textContent` and never `innerHTML` — a token called
+`<img onerror=...>` is displayed, not executed.
 
 The generated manifest is deliberately tiny — this is the whole of it:
 
