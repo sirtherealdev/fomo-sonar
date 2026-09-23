@@ -1,0 +1,3 @@
+# Copy to backend/.dev.vars (git-ignored) and fill in.
+# Used by both `npm run dev:api` and the CLI (`npm run analyze -- <mint>`).
+HELIUS_API_KEY=
