@@ -134,15 +134,51 @@ async function analyze(
    * has to be reported in-band, and by then the reader already has most of
    * the report.
    */
-  let announcePartial: (partial: AnalyzeResponse) => void = () => {};
+  /*
+   * Partials are buffered, not handed straight to the writer.
+   *
+   * The analysis emits several — one after concentration, one after the launch
+   * is read — but the response status is fixed the moment the first byte goes
+   * out. So we hold them until the race below has decided that this request is
+   * a success, then drain the buffer and keep draining as more arrive.
+   *
+   * An earlier version passed a promise's `resolve` as the callback, which
+   * silently swallowed every partial after the first.
+   */
+  const buffered: AnalyzeResponse[] = [];
+  let announceFirst: (partial: AnalyzeResponse) => void = () => {};
+  let wake: (() => void) | null = null;
+
   const firstPartial = new Promise<AnalyzeResponse>((resolve) => {
-    announcePartial = resolve;
+    announceFirst = resolve;
   });
 
-  const work = adapter.analyze(address, adapterEnv, announcePartial);
+  const emit = (partial: AnalyzeResponse): void => {
+    buffered.push(partial);
+    announceFirst(partial);
+    wake?.();
+    wake = null;
+  };
+
+  const work = adapter.analyze(address, adapterEnv, emit);
   // An unhandled rejection here would be fatal; the race below owns the error.
   work.catch(() => {});
 
+  let settled = false;
+  void work.finally(() => {
+    settled = true;
+    wake?.();
+    wake = null;
+  });
+
+  /*
+   * Race the first partial against the analysis finishing or failing.
+   *
+   * Anything that can fail fast — an unimplemented chain, a bad key — has to
+   * fail before the first byte goes out, because after that the status code is
+   * no longer ours to choose. Only a failure *after* the first partial is
+   * reported in-band, and by then the reader already has a usable report.
+   */
   const started = await Promise.race([
     firstPartial.then((partial) => ({ kind: 'partial' as const, partial })),
     work.then(
@@ -156,8 +192,16 @@ async function analyze(
   ctx.waitUntil(
     (async () => {
       try {
-        if (started.kind === 'partial') await line(started.partial);
-        const result = started.kind === 'done' ? started.result : await work;
+        let written = 0;
+        for (;;) {
+          while (written < buffered.length) await line(buffered[written++]);
+          if (settled) break;
+          await new Promise<void>((resolve) => {
+            wake = resolve;
+          });
+        }
+
+        const result = await work;
         await line(result);
 
         await env.CACHE?.put(cacheKey, JSON.stringify(result), {
@@ -165,7 +209,7 @@ async function analyze(
         });
       } catch (err) {
         console.error('analysis failed mid-stream', { chain, address, error: String(err) });
-        // The reader already has the partial; tell it the rest is not coming.
+        // The reader already has a partial; tell it the rest is not coming.
         await line({ error: 'analysis_failed', message: 'Could not finish this analysis.' });
       } finally {
         await writer.close();

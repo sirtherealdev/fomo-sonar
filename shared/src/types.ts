@@ -206,6 +206,11 @@ export interface AnalyzeMeta {
   /** ISO timestamp of the mint creation transaction, if found. */
   createdAt: string | null;
   creationSignature: string | null;
+  /**
+   * How the launch was read: by walking the token's history, or by scanning
+   * the blocks around its creation. Null when we could not read it at all.
+   */
+  launchSource: 'history' | 'block-scan' | null;
   /** Number of Helius calls this analysis cost. Useful for tuning caps. */
   rpcCalls: number;
   durationMs: number;

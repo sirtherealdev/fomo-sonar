@@ -235,6 +235,7 @@ function signals(data: AnalyzeResponse): HTMLElement {
       'Dev wallet',
       data.dev.unavailable ? null : pct(data.dev.holdingPct),
       data.dev.unavailable ? unavailableText(data.dev.unavailable) : `${pct(data.dev.soldPct)} sold`,
+      data.dev.unavailable === 'pending',
     ),
     // Bundlers and snipers report the worse of "holds now" and "took at launch":
     // wallets that already sold their launch allocation must not read as clean.

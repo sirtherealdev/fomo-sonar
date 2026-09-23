@@ -50,6 +50,16 @@ export async function scanLaunchFromBlocks(
   mint: string,
   approxTimestamp: number,
 ): Promise<BlockScanLaunch | null> {
+  /*
+   * A hard ceiling on blocks read, shared by every phase of this scan.
+   *
+   * Failure has to be cheap. Measured without this, a token whose launch could
+   * not be proven burned seventy blocks and forty seconds to conclude nothing
+   * — worse than the success it was looking for. When the budget runs out we
+   * stop and report no launch.
+   */
+  const budget = { remaining: LIMITS.blockScanTotalBlocks };
+
   const anchorSlot = await locateSlot(client, approxTimestamp);
   if (anchorSlot === null) return null;
 
@@ -64,7 +74,7 @@ export async function scanLaunchFromBlocks(
   let provenClean = false;
 
   for (let attempt = 0; attempt < LIMITS.blockScanWidenAttempts; attempt++) {
-    const probe = await scanRange(client, mint, windowStart, anchorSlot);
+    const probe = await scanRange(client, mint, windowStart, anchorSlot, budget);
     const firstHit = probe.find((slot) => slot.signatures.length > 0);
 
     if (!firstHit) {
@@ -72,7 +82,7 @@ export async function scanLaunchFromBlocks(
       break;
     }
     // A hit with quiet slots before it is the mint's first appearance: the launch.
-    if (firstHit.slot > windowStart) return readWindow(client, mint, firstHit.slot);
+    if (firstHit.slot > windowStart) return readWindow(client, mint, firstHit.slot, budget);
 
     windowStart = Math.max(0, windowStart - LIMITS.blockScanLookbackSlots);
   }
@@ -95,9 +105,10 @@ export async function scanLaunchFromBlocks(
   const chunk = LIMITS.blockScanLookbackSlots;
   for (let offset = 0; offset < LIMITS.blockScanForwardSearchSlots; offset += chunk) {
     const from = anchorSlot + offset;
-    const found = await scanRange(client, mint, from, from + chunk - 1);
+    if (budget.remaining <= 0) return null;
+    const found = await scanRange(client, mint, from, from + chunk - 1, budget);
     const firstHit = found.find((slot) => slot.signatures.length > 0);
-    if (firstHit) return readWindow(client, mint, firstHit.slot);
+    if (firstHit) return readWindow(client, mint, firstHit.slot, budget);
   }
 
   // The hint pointed somewhere this token never appears; better to report no
@@ -110,12 +121,14 @@ async function readWindow(
   client: HeliusClient,
   mint: string,
   creationSlot: number,
+  budget: Budget,
 ): Promise<BlockScanLaunch | null> {
-  // The sniper window in slots, capped by what we are willing to download.
+  // The sniper window in slots, capped by what we are willing to download and
+  // by whatever the search has already spent.
   const wanted = Math.ceil(DETECTION.sniperWindowSeconds * NOMINAL_SLOTS_PER_SECOND);
-  const covered = Math.min(wanted, LIMITS.blockScanMaxBlocks);
+  const covered = Math.max(1, Math.min(wanted, LIMITS.blockScanMaxBlocks, budget.remaining));
 
-  const slots = await scanRange(client, mint, creationSlot, creationSlot + covered);
+  const slots = await scanRange(client, mint, creationSlot, creationSlot + covered, budget);
   const windowSignatures = slots.flatMap((slot) => slot.signatures);
   const first = windowSignatures[0];
   if (!first) return null;
@@ -160,6 +173,11 @@ interface SlotHits {
   signatures: string[];
 }
 
+/** Blocks this scan may still read, shared across every phase of it. */
+interface Budget {
+  remaining: number;
+}
+
 /**
  * Signatures touching `mint` in each slot of the range, oldest slot first.
  *
@@ -171,8 +189,11 @@ async function scanRange(
   mint: string,
   fromSlot: number,
   toSlot: number,
+  budget: Budget,
 ): Promise<SlotHits[]> {
-  const slots = Array.from({ length: toSlot - fromSlot + 1 }, (_, i) => fromSlot + i);
+  const count = Math.max(0, Math.min(toSlot - fromSlot + 1, budget.remaining));
+  const slots = Array.from({ length: count }, (_, i) => fromSlot + i);
+  budget.remaining -= slots.length;
 
   const hits = await mapWithConcurrency(slots, LIMITS.blockScanConcurrency, async (slot) => {
     const signatures = await client.getBlockSignaturesTouching(slot, mint);
