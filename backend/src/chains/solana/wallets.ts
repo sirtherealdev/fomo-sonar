@@ -5,11 +5,12 @@
  * it runs once over a capped, holding-weighted set of wallets and both the
  * fresh-wallet detector and the funding-cluster detector read from its result.
  *
- * The trick that keeps it cheap: we ask for only freshWalletMaxTxCount + 1
- * signatures. If fewer come back, that IS the wallet's entire history — we get
- * the exact transaction count and the first-ever transaction in one call. If
- * the page comes back full, the wallet is busier than our threshold, which is
- * all we needed to know, and it is not fresh.
+ * The trick that keeps it cheap: one page of signatures costs the same single
+ * RPC call whether we ask for 20 or 1000, so we ask for the maximum. If fewer
+ * than a full page come back, that IS the wallet's entire history — we get its
+ * exact transaction count and its first-ever transaction from one call. Only
+ * wallets with more than a full page of history stay opaque to us, and those
+ * are old and busy by definition.
  */
 
 import { DETECTION, LIMITS } from '../../config.ts';
@@ -32,7 +33,7 @@ export async function profileWallets(
   client: HeliusClient,
   wallets: readonly string[],
 ): Promise<Map<string, WalletProfile>> {
-  const limit = DETECTION.freshWalletMaxTxCount + 1;
+  const limit = LIMITS.walletHistoryPageSize;
 
   const profiles = await mapWithConcurrency(wallets, LIMITS.concurrency, async (address) => {
     const signatures = await client.getSignatures(address, undefined, limit);

@@ -173,7 +173,7 @@ export async function analyzeMint(client: HeliusClient, mint: string): Promise<A
     insiders: insiders.unavailable ? null : insiders.holdingPct,
     authorities: authorityRisk(security),
   };
-  const { score, level, factors } = scoreRisk(factorInputs);
+  const { score, level, factors, floor } = scoreRisk(factorInputs);
 
   const partial = warnings.length > 0 || factors.length < Object.keys(factorInputs).length;
 
@@ -199,6 +199,7 @@ export async function analyzeMint(client: HeliusClient, mint: string): Promise<A
     analyzedAt: new Date().toISOString(),
     warnings,
     factors,
+    scoreFloor: floor,
     meta: {
       supply: supply.toString(),
       decimals,

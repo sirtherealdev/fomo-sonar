@@ -10,7 +10,7 @@
 
 import { SCORING } from './config.ts';
 import { clamp, round2 } from './util.ts';
-import type { RiskFactor, RiskLevel } from '@scope/shared';
+import type { RiskFactor, RiskLevel, ScoreFloor } from '@scope/shared';
 
 type FactorKey = RiskFactor['key'];
 
@@ -21,6 +21,8 @@ export interface ScoreResult {
   score: number;
   level: RiskLevel;
   factors: RiskFactor[];
+  /** Non-null when one signal alone forced the score up to a minimum. */
+  floor: ScoreFloor | null;
 }
 
 export function scoreRisk(inputs: FactorInputs): ScoreResult {
@@ -29,7 +31,7 @@ export function scoreRisk(inputs: FactorInputs): ScoreResult {
   );
 
   if (measured.length === 0) {
-    return { score: 0, level: 'low', factors: [] };
+    return { score: 0, level: 'low', factors: [], floor: null };
   }
 
   const totalWeight = measured.reduce((sum, [key]) => sum + SCORING.weights[key], 0);
@@ -41,9 +43,31 @@ export function scoreRisk(inputs: FactorInputs): ScoreResult {
     return { key, value: round2(value), normalized: round2(normalized), weight, points: round2(normalized * weight) };
   });
 
-  const score = clamp(Math.round(factors.reduce((sum, f) => sum + f.points, 0)), 0, 100);
+  const weighted = clamp(Math.round(factors.reduce((sum, f) => sum + f.points, 0)), 0, 100);
+  const floor = strongestFloor(measured);
+  const score = Math.max(weighted, floor?.floor ?? 0);
 
-  return { score, level: levelFor(score), factors };
+  // The floor only matters if it actually lifted the score.
+  return { score, level: levelFor(score), factors, floor: score > weighted ? floor : null };
+}
+
+/**
+ * The highest floor triggered by any single measured factor.
+ *
+ * This is what stops eight mild-looking averages from burying one signal that
+ * on its own means "do not buy this".
+ */
+function strongestFloor(measured: readonly [FactorKey, number][]): ScoreFloor | null {
+  let strongest: ScoreFloor | null = null;
+
+  for (const [key, value] of measured) {
+    const rule = SCORING.criticalFloors[key as keyof typeof SCORING.criticalFloors];
+    if (!rule || value < rule.atLeast) continue;
+    if (strongest && strongest.floor >= rule.floor) continue;
+    strongest = { key, value: round2(value), floor: rule.floor };
+  }
+
+  return strongest;
 }
 
 /** Linear ramp: <= safe scores 0, >= danger scores 1. */

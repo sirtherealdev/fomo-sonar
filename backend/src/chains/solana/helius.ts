@@ -90,6 +90,8 @@ export interface EnhancedTransaction {
 
 export class HeliusClient {
   private callCount = 0;
+  /** Timestamp the next request is allowed to go out, for even spacing. */
+  private nextSlotAt = 0;
   private readonly rpcUrl: string;
   private readonly enhancedUrl: string;
 
@@ -122,6 +124,20 @@ export class HeliusClient {
     return this.send<EnhancedTransaction[]>(this.enhancedUrl, JSON.stringify({ transactions: signatures }));
   }
 
+  /**
+   * Hold every caller to an even request cadence.
+   *
+   * Reserving a slot rather than sleeping a fixed amount means concurrent
+   * callers queue instead of all firing at once the moment a delay elapses.
+   */
+  private async reserveSlot(): Promise<void> {
+    const spacingMs = 1000 / LIMITS.maxRequestsPerSecond;
+    const now = Date.now();
+    const slot = Math.max(now, this.nextSlotAt);
+    this.nextSlotAt = slot + spacingMs;
+    if (slot > now) await sleep(slot - now);
+  }
+
   private async send<T>(url: string, body: string): Promise<T> {
     let lastError: unknown;
 
@@ -129,6 +145,7 @@ export class HeliusClient {
       if (attempt > 0) {
         await sleep(LIMITS.retryBaseDelayMs * 2 ** (attempt - 1));
       }
+      await this.reserveSlot();
       this.callCount++;
 
       try {
@@ -140,6 +157,11 @@ export class HeliusClient {
 
         // 429 and 5xx are worth retrying; 4xx is our bug or a bad key.
         if (res.status === 429 || res.status >= 500) {
+          // Respect Retry-After when the server tells us how long to wait.
+          const retryAfter = Number(res.headers.get('retry-after'));
+          if (Number.isFinite(retryAfter) && retryAfter > 0) {
+            this.nextSlotAt = Date.now() + retryAfter * 1000;
+          }
           lastError = new HeliusError(`Helius returned ${res.status}`, res.status);
           continue;
         }
