@@ -106,7 +106,16 @@ run `npm run dev:api`, then `npm run build:ext`, then load
 
 The panel lives in a **closed** shadow root: Fomo's CSS cannot reach in, ours
 cannot leak out, and the host page can neither read nor restyle it. It is
-draggable by its header and remembers where you left it.
+draggable by its header, anchored bottom-right (top-right is Fomo's Buy/Sell
+widget), and remembers where you left it.
+
+**It deliberately shows no price, market cap, liquidity or volume.** Fomo
+prints all four in its own header a few centimetres above, so repeating them
+would spend half the width on numbers already on screen. The panel carries only
+what Fomo does not show: the dev wallet, bundlers and their funding clusters,
+snipers, insiders, fresh wallets, concentration excluding pools, and the
+authority checks. The backend still returns the market block for other
+consumers.
 
 Token names and symbols come from third-party indexes, so everything dynamic is
 written with `textContent` and never `innerHTML` — a token called
