@@ -9,8 +9,8 @@
  * detector that needs a t-zero degrades rather than inventing one.
  */
 
-import { LIMITS } from '../config.ts';
-import type { HeliusClient, SignatureInfo } from '../helius.ts';
+import { LIMITS } from '../../config.ts';
+import type { HeliusClient, SignatureInfo } from './helius.ts';
 
 export interface CreationResult {
   found: boolean;

@@ -11,10 +11,10 @@
  * counts, which is the whole headline strip.
  */
 
-import type { MarketInfo, TokenInfo } from '@scope/shared';
+import type { ChainId, MarketInfo, TokenInfo } from '@scope/shared';
 
 const TOKENS_URL = 'https://api.dexscreener.com/latest/dex/tokens';
-const ORDERS_URL = 'https://api.dexscreener.com/orders/v1/solana';
+const ORDERS_URL = 'https://api.dexscreener.com/orders/v1';
 
 /** Give up quickly: market data is a nice-to-have, the risk report is not. */
 const TIMEOUT_MS = 4000;
@@ -45,12 +45,12 @@ export interface MarketResult {
   token: Partial<TokenInfo>;
 }
 
-export async function fetchMarket(mint: string): Promise<MarketResult> {
-  const [pairs, paidOrder] = await Promise.all([fetchPairs(mint), fetchDexPaid(mint)]);
+export async function fetchMarket(chain: ChainId, mint: string): Promise<MarketResult> {
+  const [pairs, paidOrder] = await Promise.all([fetchPairs(mint), fetchDexPaid(chain, mint)]);
 
   // A token can trade in several pools. The deepest one is the honest quote.
   const pair = pairs
-    .filter((p) => p.chainId === 'solana')
+    .filter((p) => p.chainId === chain)
     .sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0))[0];
 
   if (!pair) return { market: null, token: {} };
@@ -112,11 +112,11 @@ function dexPaid(paidOrder: boolean | null, pair: DexPair): boolean | null {
 }
 
 /** Orders endpoint only: approved tokenProfile purchases. */
-async function fetchDexPaid(mint: string): Promise<boolean | null> {
+async function fetchDexPaid(chain: ChainId, mint: string): Promise<boolean | null> {
   type Order = { type?: string; status?: string };
   // The endpoint has returned both a bare array and { orders: [...] } in the
   // wild, so accept either rather than trusting the documented shape.
-  const body = await getJson<Order[] | { orders?: Order[] }>(`${ORDERS_URL}/${mint}`);
+  const body = await getJson<Order[] | { orders?: Order[] }>(`${ORDERS_URL}/${chain}/${mint}`);
   if (!body) return null;
 
   const orders = Array.isArray(body) ? body : (body.orders ?? []);

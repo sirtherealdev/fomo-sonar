@@ -13,9 +13,42 @@
  * calls the page did not already make.
  */
 
+import type { ChainId } from '@scope/shared';
+
+/** A token is only identified by chain AND address: 0x… is ambiguous on its own. */
+export interface TokenRef {
+  chain: ChainId;
+  address: string;
+}
+
 /** 32 bytes of base58: 32-44 characters, no 0/O/I/l. */
 const BASE58_ADDRESS = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const BASE58_ANYWHERE = /[1-9A-HJ-NP-Za-km-z]{32,44}/;
+/** 20 bytes of hex. */
+const EVM_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+
+/**
+ * URL/label spellings Fomo might use for each chain.
+ *
+ * TODO(confirm): needs a real token page on a non-Solana chain. A base58
+ * address identifies Solana on its own, but every EVM chain shares the same
+ * 0x… format — without a chain hint we would be analysing Base's address
+ * against Ethereum's state and reporting confident nonsense.
+ */
+const CHAIN_ALIASES: Record<string, ChainId> = {
+  solana: 'solana',
+  sol: 'solana',
+  base: 'base',
+  bsc: 'bsc',
+  bnb: 'bsc',
+  bnbchain: 'bsc',
+  monad: 'monad',
+  robinhood: 'robinhood',
+  rhc: 'robinhood',
+  arc: 'arc',
+  ethereum: 'ethereum',
+  eth: 'ethereum',
+};
 
 /**
  * Fomo token-page URL shapes.
@@ -24,11 +57,12 @@ const BASE58_ANYWHERE = /[1-9A-HJ-NP-Za-km-z]{32,44}/;
  * page. The list is ordered; the first pattern whose capture group is a valid
  * address wins. Adding a shape means adding one line here and nothing else.
  */
+const ADDRESS = '(0x[0-9a-fA-F]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})';
 const URL_PATTERNS: readonly RegExp[] = [
-  /\/token\/(?:[a-z]+\/)?([1-9A-HJ-NP-Za-km-z]{32,44})/i,
-  /\/coin\/([1-9A-HJ-NP-Za-km-z]{32,44})/i,
-  /\/t\/([1-9A-HJ-NP-Za-km-z]{32,44})/i,
-  /\/trade\/([1-9A-HJ-NP-Za-km-z]{32,44})/i,
+  new RegExp(`/token/(?:[a-z]+/)?${ADDRESS}`, 'i'),
+  new RegExp(`/coin/${ADDRESS}`, 'i'),
+  new RegExp(`/t/${ADDRESS}`, 'i'),
+  new RegExp(`/trade/${ADDRESS}`, 'i'),
 ];
 
 /** Hosts whose links reliably carry a mint address in a known path position. */
@@ -44,17 +78,52 @@ export function isValidAddress(value: string): boolean {
   return BASE58_ADDRESS.test(value);
 }
 
-/** Mint from the URL, or null if this is not a token page. */
+/** The chain named somewhere in the URL path, if any. */
+export function chainFromUrl(url: string): ChainId | null {
+  try {
+    for (const segment of new URL(url).pathname.split('/')) {
+      const chain = CHAIN_ALIASES[segment.toLowerCase()];
+      if (chain) return chain;
+    }
+  } catch {
+    // Malformed URL: nothing to read.
+  }
+  return null;
+}
+
+/**
+ * Chain plus address, or null when this is not a token page.
+ *
+ * A base58 address is unambiguously Solana. A 0x address needs the chain from
+ * the URL — we return null rather than guess, because analysing the wrong
+ * chain produces a confident, completely wrong report.
+ */
+export function detectToken(url: string = location.href): TokenRef | null {
+  const address = mintFromUrl(url) ?? mintFromDom() ?? mintFromCopyTarget();
+  if (!address) return null;
+
+  if (BASE58_ADDRESS.test(address)) return { chain: 'solana', address };
+
+  const chain = chainFromUrl(url);
+  return chain ? { chain, address } : null;
+}
+
+/** Either address format. */
+export function isTokenAddress(value: string): boolean {
+  return BASE58_ADDRESS.test(value) || EVM_ADDRESS.test(value);
+}
+
+/** Token address from the URL, or null if this is not a token page. */
 export function mintFromUrl(url: string): string | null {
   for (const pattern of URL_PATTERNS) {
-    const mint = pattern.exec(url)?.[1];
-    if (mint && isValidAddress(mint)) return mint;
+    const address = pattern.exec(url)?.[1];
+    if (address && isTokenAddress(address)) return address;
   }
 
   // Some apps carry the address in a query parameter instead of the path.
   try {
     for (const value of new URL(url).searchParams.values()) {
-      if (isValidAddress(value)) return value;
+      if (isTokenAddress(value)) return value;
     }
   } catch {
     // Malformed URL: nothing to read, and definitely nothing to throw over.
@@ -112,7 +181,4 @@ export function mintFromCopyTarget(root: ParentNode = document): string | null {
   return null;
 }
 
-/** URL first, then the DOM fallbacks. Null means "not a token page". */
-export function detectMint(url: string = location.href): string | null {
-  return mintFromUrl(url) ?? mintFromDom() ?? mintFromCopyTarget();
-}
+

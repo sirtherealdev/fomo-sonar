@@ -5,6 +5,22 @@
  * Raw token amounts are strings (base units) because they overflow Number.
  */
 
+/**
+ * Chains we can analyse. The ids match DexScreener's, because the market layer
+ * is already multichain and there is no reason to invent a second vocabulary.
+ */
+export type ChainId =
+  | 'solana'
+  | 'base'
+  | 'bsc' // BNB Chain
+  | 'monad'
+  | 'robinhood' // Robinhood Chain
+  | 'arc'
+  | 'ethereum';
+
+/** Chain families that share a set of primitives, and therefore an adapter. */
+export type ChainFamily = 'svm' | 'evm';
+
 export type RiskLevel = 'low' | 'medium' | 'high';
 
 /** Why a detector could not produce a number. Surfaced so the UI never shows a fake 0. */
@@ -13,7 +29,8 @@ export type Unavailable =
   | 'no-early-trades' // creation found, but no trades inside the analysis window
   | 'no-dev-allocation' // dev never held any of the supply, so "sold %" is meaningless
   | 'holder-set-partial' // holder pagination hit its cap, percentages would understate
-  | 'no-market-data'; // the token is not indexed on any DEX we can read
+  | 'no-market-data' // the token is not indexed on any DEX we can read
+  | 'not-supported-on-chain'; // this chain's adapter cannot measure this signal
 
 export interface HolderEntry {
   /** Wallet that owns the token account, not the token account itself. */
@@ -100,14 +117,22 @@ export interface TokenInfo {
 }
 
 /**
- * Authority checks. `null` on an authority field means revoked, which is the
- * safe state: nobody can mint more supply / freeze your balance.
+ * Can anyone still change the rules of this token?
+ *
+ * The question is the same on every chain, the mechanism is not: on Solana it
+ * is the mint and freeze authorities on the mint account, on EVM it is an
+ * un-renounced owner with a mint or pause function. Adapters answer the
+ * question; the panel never has to know which chain it is looking at.
  */
 export interface SecurityInfo {
-  mintAuthority: string | null;
-  freezeAuthority: string | null;
-  mintAuthorityRevoked: boolean;
-  freezeAuthorityRevoked: boolean;
+  /** Someone can still create new supply. */
+  canMintMore: boolean;
+  /** Someone can still freeze or pause balances. */
+  canFreeze: boolean;
+  /** Address holding that power, when there is a single one. */
+  controller: string | null;
+  /** Chain-specific detail, for the "why" line in the panel. */
+  detail: string | null;
 }
 
 /** Headline market numbers. Third-party data, so every field can be null. */
@@ -145,7 +170,9 @@ export interface AnalyzeMeta {
 }
 
 export interface AnalyzeResponse {
+  /** Contract address: a base58 mint on Solana, a 0x address on EVM chains. */
   mint: string;
+  chain: ChainId;
   token: TokenInfo;
   market: MarketInfo | null;
   security: SecurityInfo;

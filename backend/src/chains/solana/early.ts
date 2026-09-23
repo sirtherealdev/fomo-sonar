@@ -11,10 +11,10 @@
  * first slot is exactly as interesting as one that bought it.
  */
 
-import { DETECTION, LIMITS } from '../config.ts';
-import type { EnhancedTransaction, HeliusClient, SignatureInfo } from '../helius.ts';
-import { chunk } from '../util.ts';
-import { isBurnAddress, knownProgramName } from '../known-accounts.ts';
+import { DETECTION, LIMITS } from '../../config.ts';
+import type { EnhancedTransaction, HeliusClient, SignatureInfo } from './helius.ts';
+import { chunk } from '../../util.ts';
+import { isBurnAddress, knownProgramName } from './known-accounts.ts';
 import type { CreationResult } from './creation.ts';
 
 export interface EarlyReceipt {

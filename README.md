@@ -1,6 +1,10 @@
 # SCOPE Scanner
 
-Read-only token risk overlay for [Fomo Web](https://fomo.family). Solana only for now.
+Read-only token risk overlay for [Fomo Web](https://fomo.family).
+
+Fomo supports seven chains — Solana, Base, BNB Chain, Monad, Robinhood Chain,
+Arc and Ethereum. Six of those are EVM, so the backend needs two adapters, not
+seven implementations. **Solana is implemented; the EVM adapter is a stub.**
 
 The extension detects when you are on a token page, reads the mint address, and
 shows the numbers you would otherwise open a second terminal for: price, market
@@ -32,8 +36,19 @@ is auditable in an afternoon:
 
 ## Backend
 
-`GET /analyze/:mint` returns the full report. See
-[`shared/src/types.ts`](shared/src/types.ts) for the exact shape.
+```
+GET /analyze/:chain/:address    # base, bsc, monad, robinhood, arc, ethereum -> 501 for now
+GET /analyze/:address           # Solana, the original single-argument form
+GET /health                     # which chains exist, and which are implemented
+```
+
+See [`shared/src/types.ts`](shared/src/types.ts) for the exact response shape.
+
+Chain-specific code lives in `backend/src/chains/<chain>/` behind the
+[`ChainAdapter`](backend/src/chains/types.ts) interface. Adding a chain is one
+line in [`registry.ts`](backend/src/chains/registry.ts); nothing outside an
+adapter branches on a chain id. What EVM needs, signal by signal, is written
+down in [`chains/evm/index.ts`](backend/src/chains/evm/index.ts).
 
 All thresholds and scoring weights live in
 [`backend/src/config.ts`](backend/src/config.ts) — nothing tunable is hidden
@@ -51,16 +66,17 @@ cp backend/.dev.vars.example backend/.dev.vars   # then paste your Helius key
 The CLI runs the same code the Worker runs, without deploying anything:
 
 ```bash
-npm run analyze -- <mint>            # readable report
-npm run analyze -- <mint> --json     # full response
-npm run analyze -- <mintA> <mintB>   # compare several
+npm run analyze -- <address>                  # readable report (Solana)
+npm run analyze -- <address> --json           # full response
+npm run analyze -- <a> <b>                    # compare several
+npm run analyze -- <address> --chain=base     # other chains, once implemented
 ```
 
 ### Run the API locally
 
 ```bash
 npm run dev:api
-curl localhost:8787/analyze/<mint> -H 'origin: https://fomo.family'
+curl localhost:8787/analyze/solana/<address> -H 'origin: https://fomo.family'
 ```
 
 ### Deploy
@@ -117,7 +133,7 @@ Each detector is one file in `backend/src/analysis/`, commented in place.
 | **Snipers** | Buyers inside the first `sniperWindowSeconds`, excluding bundlers so the score cannot count a wallet twice. |
 | **Fresh wallets** | Holders with `<= freshWalletMaxTxCount` lifetime transactions, or first seen less than `freshWalletMaxAgeHours` ago. |
 | **Insiders** | Notable wallets whose first SOL came from the dev, plus the dev's own funder when it also holds. One hop only — deeper graph walks mostly find exchange hot wallets. |
-| **Authorities** | Mint authority live means the supply is not final and can be diluted at will; freeze authority live means balances can be locked. Both read straight off the mint account. |
+| **Authorities** | Can anyone still mint more supply or freeze balances? On Solana that is the mint and freeze authorities; on EVM it is an un-renounced owner. The panel sees one chain-neutral answer. |
 | **Risk score** | Weighted sum of the percentages above, each through a safe→danger ramp. A signal we could not measure is dropped and its weight redistributed — never scored as zero. |
 
 ### Headline data
