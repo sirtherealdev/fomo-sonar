@@ -111,8 +111,16 @@ export const LIMITS = {
   /** Wallets we check for freshness. 1 RPC call each, so this is the big lever. */
   maxFreshWalletChecks: 40,
 
-  /** Parallel in-flight Helius requests. Helius free tier tolerates ~10 rps. */
-  concurrency: 8,
+  /**
+   * Parallel in-flight Helius requests.
+   *
+   * The Helius free plan allows 10 requests/sec, so 5 leaves headroom for the
+   * sequential calls happening alongside the parallel batch. On a paid plan
+   * (50 rps on Developer) this can go to 20+ and the analysis gets noticeably
+   * faster. 429s are retried with backoff either way, so a too-high value
+   * costs latency rather than correctness.
+   */
+  concurrency: 5,
 
   /** Per-request retries on 429/5xx, with exponential backoff. */
   maxRetries: 3,
