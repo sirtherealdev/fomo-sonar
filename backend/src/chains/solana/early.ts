@@ -51,7 +51,7 @@ export async function analyzeEarlyWindow(
   mint: string,
   creation: CreationResult,
 ): Promise<EarlyWindow> {
-  if (!creation.found) {
+  if (!creation.found || !creation.dev) {
     return { receipts: [], boughtByWallet: new Map(), devInitialUiAmount: 0, truncated: false };
   }
 
@@ -59,15 +59,33 @@ export async function analyzeEarlyWindow(
   // the first N seconds. Signatures are already oldest-first.
   const maxSlot = creation.slot + DETECTION.bundleSlotWindow;
   const maxTime = creation.timestamp + DETECTION.sniperWindowSeconds;
-
   const inWindow = creation.signatures.filter((sig) => inEarlyWindow(sig, maxSlot, maxTime));
-  const truncated = inWindow.length > LIMITS.maxEarlyTransactions;
-  const selected = inWindow.slice(0, LIMITS.maxEarlyTransactions);
 
-  const batches = chunk(
-    selected.map((s) => s.signature),
-    100,
+  return readEarlyWindow(
+    client,
+    mint,
+    { dev: creation.dev, slot: creation.slot, timestamp: creation.timestamp },
+    inWindow.map((sig) => sig.signature),
   );
+}
+
+/**
+ * Derive the launch participants from a list of signatures.
+ *
+ * Shared by both ways of finding a launch — walking the token's history, and
+ * scanning the blocks around its creation — so the two can never disagree
+ * about who counts as a bundler.
+ */
+export async function readEarlyWindow(
+  client: HeliusClient,
+  mint: string,
+  creation: { dev: string; slot: number; timestamp: number },
+  signatures: readonly string[],
+): Promise<EarlyWindow> {
+  const truncated = signatures.length > LIMITS.maxEarlyTransactions;
+  const selected = signatures.slice(0, LIMITS.maxEarlyTransactions);
+
+  const batches = chunk(selected, 100);
 
   const parsed: EnhancedTransaction[] = [];
   // Sequential: these batches are large and Helius rate-limits them harder.

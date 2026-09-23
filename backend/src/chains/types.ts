@@ -42,6 +42,12 @@ export interface StoredLaunch {
   bought: Record<string, number>;
   /** True when the launch window held more transactions than we fetched. */
   truncated: boolean;
+  /**
+   * How we found this launch. 'history' means we walked the token's signatures
+   * back to its first transaction; 'block-scan' means the history was too long
+   * and we jumped to the launch slot and read the blocks there instead.
+   */
+  source: 'history' | 'block-scan';
 }
 
 export interface LaunchCache {

@@ -10,6 +10,12 @@
 
 import { LIMITS } from '../../config.ts';
 
+/**
+ * Highest transaction version we can decode. Too low and getBlock refuses any
+ * block containing a newer transaction, which today is most of them.
+ */
+const MAX_TRANSACTION_VERSION = 2;
+
 export class HeliusError extends Error {
   constructor(
     message: string,
@@ -276,6 +282,50 @@ export class HeliusClient {
       { encoding: 'base64', dataSlice: { offset: 0, length: 0 } },
     ]);
     return res.value;
+  }
+
+  /**
+   * Signatures in `slot` whose transaction touches `mint`.
+   *
+   * `transactionDetails: 'accounts'` is the lightest form that still lets us
+   * filter — it returns each transaction's account keys and signature without
+   * the instruction data. A block is ~600 KB gzipped this way, and we throw
+   * away everything but the handful of matches before the next block arrives.
+   *
+   * A skipped or unavailable slot yields nothing rather than throwing: gaps in
+   * the ledger are normal and must not fail a scan.
+   */
+  async getBlockSignaturesTouching(slot: number, mint: string): Promise<string[]> {
+    interface BlockTx {
+      transaction?: { signatures?: string[]; accountKeys?: (string | { pubkey?: string })[] };
+    }
+
+    let block: { transactions?: BlockTx[] } | null;
+    try {
+      block = await this.rpc<{ transactions?: BlockTx[] } | null>('getBlock', [
+        slot,
+        {
+          encoding: 'json',
+          transactionDetails: 'accounts',
+          maxSupportedTransactionVersion: MAX_TRANSACTION_VERSION,
+          rewards: false,
+        },
+      ]);
+    } catch {
+      return [];
+    }
+    if (!block?.transactions) return [];
+
+    const matches: string[] = [];
+    for (const tx of block.transactions) {
+      const keys = tx.transaction?.accountKeys ?? [];
+      const touches = keys.some((key) => (typeof key === 'string' ? key : key.pubkey) === mint);
+      if (!touches) continue;
+
+      const signature = tx.transaction?.signatures?.[0];
+      if (signature) matches.push(signature);
+    }
+    return matches;
   }
 
   /** Token account -> owning wallet, for the largest-accounts list. */

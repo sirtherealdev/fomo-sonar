@@ -203,6 +203,30 @@ export const LIMITS = {
   maxRequestsPerSecond: 8,
 
   /**
+   * Block scanning — the fallback that reads a launch directly instead of
+   * paging backwards through a token's entire history.
+   *
+   * Each block is ~600 KB gzipped, so these are a bandwidth and memory budget
+   * as much as a call budget.
+   */
+  /** Slots read before the estimated launch, to prove we did not start late. */
+  blockScanLookbackSlots: 8,
+  /** How many times we step further back when the mint appears in the lookback. */
+  blockScanWidenAttempts: 3,
+  /** Hard cap on slots read forward from the launch. 25 slots ~= 10 seconds. */
+  blockScanMaxBlocks: 25,
+  /** Blocks in flight at once. Each one held in memory is several megabytes. */
+  blockScanConcurrency: 4,
+  /** Times the slot bracket may widen before we give up locating the moment. */
+  blockScanBracketAttempts: 4,
+  /**
+   * Slots searched forward from the located moment before concluding the token
+   * was not launched there. Scanned in lookback-sized chunks, so a token found
+   * immediately costs only the first chunk.
+   */
+  blockScanForwardSearchSlots: 48,
+
+  /**
    * Per-request retries on 429/5xx, with exponential backoff
    * (400ms, 800ms, 1.6s, 3.2s, 6.4s). Sustained rate limiting needs a budget
    * this long; three short retries just fail slower.

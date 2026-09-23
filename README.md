@@ -206,7 +206,21 @@ transactions — a label that fires that often teaches people to ignore it.
 
 ### Known limits
 
-- **A token's launch becomes unreadable fast.** RPC only returns signatures
+- **Reaching a launch has two paths.** Normally we walk the token's signatures
+  back to its first transaction. When that is too long — see below — we jump
+  instead: the earliest pool's creation time tells us roughly when the token
+  launched, a bracketed binary search over `getBlockTime` turns that into a
+  slot, and we read the blocks there directly, keeping only transactions that
+  touch the mint. Blocks compress to ~600 KB on the wire, so a full launch
+  window is tens of megabytes, and it works at any age.
+
+  The scan refuses to guess. It reads slots *before* the estimate, and unless
+  it can show the mint was absent there, it reports no launch at all. That
+  check matters: an early version used the deepest pool's creation time, landed
+  four minutes past the real launch, and confidently reported a passing trade
+  as the dev wallet. `meta.launchSource` says which path produced a report.
+
+- **A token's launch becomes unreadable by walking fast.** RPC only returns signatures
   newest-first, so reaching a token's first transaction means paging backwards
   through its whole history, capped at `LIMITS.maxSignaturePages`. Measured on
   a live token: it was readable, and ten minutes later it was not — it had
