@@ -176,6 +176,15 @@ export interface MarketInfo {
   dexId: string | null;
   pairAddress: string | null;
   pairCreatedAt: string | null;
+  /**
+   * Creation time of the *earliest* pool for this token, across every pool.
+   *
+   * Not the same as `pairCreatedAt`, which belongs to the deepest pool. For a
+   * token that migrated, the deepest pool was created long after the launch —
+   * using it as a launch hint sent a block scan four minutes past the real
+   * creation and it confidently reported a passing trade as the launch.
+   */
+  firstPairCreatedAt: string | null;
   /** True when the team has paid for a DexScreener token profile. */
   dexPaid: boolean | null;
   source: 'dexscreener';

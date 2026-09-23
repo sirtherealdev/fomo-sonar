@@ -27,7 +27,8 @@ import { HeliusClient } from './helius.ts';
 import { fetchMarket } from '../../market.ts';
 import { pctOf, round2 } from '../../util.ts';
 import { findCreation, type CreationResult } from './creation.ts';
-import { analyzeEarlyWindow } from './early.ts';
+import { analyzeEarlyWindow, readEarlyWindow } from './early.ts';
+import { scanLaunchFromBlocks } from './block-scan.ts';
 import { buildHolderMap, getTopHolders, holdingPctOf } from './holders.ts';
 import { isFreshWallet, profileWallets, type WalletProfile } from './wallets.ts';
 import { scoreRisk, type FactorInputs } from '../../scoring.ts';
@@ -69,11 +70,7 @@ export async function analyzeMint(
     fetchMarket('solana', mint),
   ]);
 
-  if (creation?.truncated) {
-    baseWarnings.push(
-      `This token has more than ${LIMITS.maxSignaturePages * 1000} transactions, so we could not reach its first one. Dev, bundler and sniper detection are unavailable.`,
-    );
-  }
+
   if (holderMap.truncated) {
     baseWarnings.push(
       `More than ${LIMITS.maxHolderPages * 1000} holders; wallet-set percentages are a lower bound.`,
@@ -83,11 +80,27 @@ export async function analyzeMint(
     baseWarnings.push('No DEX pool found for this token, so price and liquidity are unavailable.');
   }
 
-  const launch = cachedLaunch ?? (await readLaunch(client, mint, creation));
+  const launch =
+    cachedLaunch ??
+    (await readLaunch(
+      client,
+      mint,
+      creation,
+      marketResult.market?.firstPairCreatedAt ?? null,
+    ));
 
   if (launch && !cachedLaunch) {
     // Fire and forget: a cache write must never delay or fail a response.
     void cache?.put('solana', mint, launch).catch(() => {});
+  }
+  if (!launch) {
+    baseWarnings.push(
+      'This token has traded too much to reach its launch, and we could not locate it from market data either. Dev, bundler and sniper detection are unavailable.',
+    );
+  } else if (launch.source === 'block-scan') {
+    baseWarnings.push(
+      'Launch read by scanning the blocks around it, because the token has too much history to walk back through.',
+    );
   }
   if (launch?.truncated) {
     baseWarnings.push(
@@ -295,14 +308,64 @@ async function readLaunch(
   client: HeliusClient,
   mint: string,
   creation: CreationResult | null,
+  pairCreatedAt: string | null,
 ): Promise<StoredLaunch | null> {
-  if (!creation?.found || !creation.dev) return null;
+  if (creation?.found && creation.dev) {
+    return buildLaunch(
+      creation.signature ?? '',
+      creation.dev,
+      creation.slot,
+      creation.timestamp,
+      await analyzeEarlyWindow(client, mint, creation),
+      'history',
+    );
+  }
 
-  const early = await analyzeEarlyWindow(client, mint, creation);
+  /*
+   * History was too long to walk back to the launch. Jump to it instead: the
+   * market data tells us roughly when the pool was created, which for a
+   * launchpad token is the same transaction as the mint, and we read the
+   * blocks there directly. This is the only path that works on a token that
+   * has already traded heavily.
+   */
+  if (!pairCreatedAt) return null;
+
+  const hint = Math.floor(new Date(pairCreatedAt).getTime() / 1000);
+  if (!Number.isFinite(hint)) return null;
+
+  const scan = await scanLaunchFromBlocks(client, mint, hint);
+  if (!scan) return null;
+
+  const early = await readEarlyWindow(
+    client,
+    mint,
+    { dev: scan.dev, slot: scan.slot, timestamp: scan.timestamp },
+    scan.windowSignatures,
+  );
+
+  return buildLaunch(
+    scan.signature,
+    scan.dev,
+    scan.slot,
+    scan.timestamp,
+    { ...early, truncated: early.truncated || scan.truncated },
+    'block-scan',
+  );
+}
+
+/** Turn a launch window into the record we store and report. */
+function buildLaunch(
+  signature: string,
+  dev: string,
+  slot: number,
+  timestamp: number,
+  early: Awaited<ReturnType<typeof analyzeEarlyWindow>>,
+  source: StoredLaunch['source'],
+): StoredLaunch {
 
   const bundlers = new Set<string>();
   const snipers = new Set<string>();
-  const maxBundleSlot = creation.slot + DETECTION.bundleSlotWindow;
+  const maxBundleSlot = slot + DETECTION.bundleSlotWindow;
 
   for (const receipt of early.receipts) {
     if (receipt.slot <= maxBundleSlot) bundlers.add(receipt.wallet);
@@ -313,15 +376,16 @@ async function readLaunch(
   for (const wallet of bundlers) snipers.delete(wallet);
 
   return {
-    signature: creation.signature ?? '',
-    dev: creation.dev,
-    slot: creation.slot,
-    timestamp: creation.timestamp,
+    signature,
+    dev,
+    slot,
+    timestamp,
     devInitialUiAmount: early.devInitialUiAmount,
     bundlers: [...bundlers],
     snipers: [...snipers],
     bought: Object.fromEntries(early.boughtByWallet),
     truncated: early.truncated,
+    source,
   };
 }
 

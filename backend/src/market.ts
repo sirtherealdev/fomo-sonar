@@ -49,11 +49,19 @@ export async function fetchMarket(chain: ChainId, mint: string): Promise<MarketR
   const [pairs, paidOrder] = await Promise.all([fetchPairs(mint), fetchDexPaid(chain, mint)]);
 
   // A token can trade in several pools. The deepest one is the honest quote.
-  const pair = pairs
-    .filter((p) => p.chainId === chain)
-    .sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0))[0];
+  const solanaPairs = pairs.filter((p) => p.chainId === chain);
+  const pair = [...solanaPairs].sort(
+    (a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0),
+  )[0];
 
   if (!pair) return { market: null, token: {} };
+
+  // The oldest pool is the launch; the deepest one may have come much later.
+  const earliest = solanaPairs.reduce<number | null>(
+    (oldest, p) =>
+      p.pairCreatedAt && (oldest === null || p.pairCreatedAt < oldest) ? p.pairCreatedAt : oldest,
+    null,
+  );
 
   const market: MarketInfo = {
     priceUsd: toNumber(pair.priceUsd),
@@ -73,6 +81,7 @@ export async function fetchMarket(chain: ChainId, mint: string): Promise<MarketR
     dexId: pair.dexId ?? null,
     pairAddress: pair.pairAddress ?? null,
     pairCreatedAt: pair.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : null,
+    firstPairCreatedAt: earliest ? new Date(earliest).toISOString() : null,
     dexPaid: dexPaid(paidOrder, pair),
     source: 'dexscreener',
   };
