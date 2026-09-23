@@ -298,12 +298,13 @@ function makeDraggable(handle: HTMLElement, host: HTMLElement, state: PanelState
   let startX = 0;
   let startY = 0;
   let startRight = state.right;
-  let startTop = state.top;
+  let startBottom = state.bottom;
 
   const onPointerMove = (event: PointerEvent): void => {
-    // Right-anchored, so rightwards pointer movement *decreases* the offset.
+    // Anchored to the right and bottom edges, so moving the pointer right or
+    // down *decreases* the offsets.
     state.right = clamp(startRight - (event.clientX - startX), 0, window.innerWidth - 60);
-    state.top = clamp(startTop + (event.clientY - startY), 0, window.innerHeight - 40);
+    state.bottom = clamp(startBottom - (event.clientY - startY), 0, window.innerHeight - 40);
     applyPosition(host, state);
   };
 
@@ -322,7 +323,7 @@ function makeDraggable(handle: HTMLElement, host: HTMLElement, state: PanelState
     startX = event.clientX;
     startY = event.clientY;
     startRight = state.right;
-    startTop = state.top;
+    startBottom = state.bottom;
 
     handle.classList.add('dragging');
     handle.setPointerCapture(event.pointerId);
@@ -370,7 +371,7 @@ function render(container: HTMLElement, nodes: Node[]): void {
 
 function applyPosition(host: HTMLElement, state: PanelState): void {
   host.style.right = `${state.right}px`;
-  host.style.top = `${state.top}px`;
+  host.style.bottom = `${state.bottom}px`;
 }
 
 function clamp(value: number, min: number, max: number): number {
