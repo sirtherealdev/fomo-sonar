@@ -91,9 +91,18 @@ npx wrangler deploy
 ## Extension
 
 ```bash
-npm run dev:ext                 # loads an unpacked build with hot reload
+npm run build:ext               # build pointed at the local Worker
+npm run dev:ext                 # hot reload, but in a fresh Chrome profile
 npm test -w @scope/extension    # address/chain detection tests
 ```
+
+To try it against a real Fomo page you need to be logged in, so load it into
+your own browser rather than using `dev:ext` (which launches a clean profile):
+run `npm run dev:api`, then `npm run build:ext`, then load
+`extension/.output/chrome-mv3` at `chrome://extensions` with Developer mode on.
+
+`build:ext` points the extension at `http://localhost:8787`. A plain
+`npm run build -w @scope/extension` points it at the deployed Worker.
 
 The panel lives in a **closed** shadow root: Fomo's CSS cannot reach in, ours
 cannot leak out, and the host page can neither read nor restyle it. It is

@@ -9,7 +9,8 @@
     "zip": "wxt zip",
     "postinstall": "wxt prepare",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test lib/*.test.ts"
+    "test": "node --import tsx --test lib/*.test.ts",
+    "build:local": "wxt build --mode development"
   },
   "dependencies": {
     "@scope/shared": "*"

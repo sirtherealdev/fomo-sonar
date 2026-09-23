@@ -12,7 +12,8 @@
     "analyze": "npm run analyze -w @scope/backend --",
     "dev:api": "npm run dev -w @scope/backend",
     "typecheck": "npm run typecheck -w @scope/shared && npm run typecheck -w @scope/backend && npm run typecheck -w @scope/extension",
-    "dev:ext": "npm run dev -w @scope/extension"
+    "dev:ext": "npm run dev -w @scope/extension",
+    "build:ext": "npm run build:local -w @scope/extension"
   },
   "engines": {
     "node": ">=20"
