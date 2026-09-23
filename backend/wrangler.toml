@@ -19,5 +19,15 @@ compatibility_flags = ["nodejs_compat"]
 binding = "CACHE"
 id = "local-dev-placeholder"
 
+# Per-IP rate limiting. This endpoint fronts our Helius key, so an unlimited
+# public URL is an unlimited bill. 30 requests a minute is far more than a
+# person clicking through tokens needs, and repeat views are served from cache
+# without reaching the limiter at all.
+[[unsafe.bindings]]
+name = "RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 30, period = 60 }
+
 [observability]
 enabled = true

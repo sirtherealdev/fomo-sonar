@@ -16,6 +16,11 @@ import { getAdapter, implementedChains, supportedChains } from './chains/registr
 import { ChainNotSupportedError, UnknownChainError, type LaunchCache, type StoredLaunch } from './chains/types.ts';
 import type { AnalyzeResponse, ApiError } from '@scope/shared';
 
+/** Cloudflare's rate limit binding, narrowed to what we call. */
+interface RateLimiter {
+  limit(options: { key: string }): Promise<{ success: boolean }>;
+}
+
 interface Env {
   /** Solana. */
   HELIUS_API_KEY: string;
@@ -23,6 +28,8 @@ interface Env {
   EVM_RPC_URL?: string;
   /** Optional: the Worker runs without it, just uncached. */
   CACHE?: KVNamespace;
+  /** Optional: absent in local dev, where there is nobody to rate limit. */
+  RATE_LIMITER?: RateLimiter;
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -50,6 +57,35 @@ app.use('*', async (c, next) => {
     c.res.headers.set('access-control-allow-origin', origin);
     c.res.headers.set('vary', 'origin');
   }
+});
+
+/*
+ * Rate limiting.
+ *
+ * This endpoint fronts our Helius key, so an unlimited public URL is an
+ * unlimited bill. The limit is per client IP and deliberately generous: a
+ * person clicking through tokens makes one request per token, repeat views of
+ * the same token are served from cache and never reach here at all.
+ *
+ * Extensions cannot forge CF-Connecting-IP — Cloudflare sets it at the edge —
+ * so it is the right key. With no binding configured (local dev) nothing is
+ * limited, which is correct: there is nobody else on localhost.
+ */
+app.use('/analyze/*', async (c, next) => {
+  const limiter = c.env.RATE_LIMITER;
+  if (!limiter) return next();
+
+  const ip = c.req.header('cf-connecting-ip') ?? 'unknown';
+  const { success } = await limiter.limit({ key: ip });
+
+  if (!success) {
+    return c.json<ApiError>(
+      { error: 'rate_limited', message: 'Too many tokens too quickly. Try again in a moment.' },
+      429,
+      { 'retry-after': '30' },
+    );
+  }
+  return next();
 });
 
 app.get('/health', (c) =>

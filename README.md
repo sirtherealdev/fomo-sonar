@@ -83,10 +83,30 @@ curl localhost:8787/analyze/solana/<address> -H 'origin: https://fomo.family'
 
 ```bash
 cd backend
+npx wrangler login
 npx wrangler kv namespace create CACHE   # paste the id into wrangler.toml
-npx wrangler secret put HELIUS_API_KEY
-npx wrangler deploy
+npx wrangler secret put HELIUS_API_KEY   # paste the key when prompted
+npx wrangler deploy                      # prints the live URL
 ```
+
+Then point the extension at it and rebuild:
+
+```bash
+echo 'WXT_API_BASE=https://scope-scanner-api.YOUR-SUBDOMAIN.workers.dev' > extension/.env
+npm run build -w @scope/extension
+```
+
+Reload the unpacked extension at `chrome://extensions` afterwards.
+
+**The KV id matters.** `wrangler dev` ignores it and keeps state locally, so a
+placeholder works in development and silently does nothing in production — the
+launch cache would never persist and every analysis would pay full price.
+
+**Rate limiting is per client IP**, 30 requests a minute, configured in
+`wrangler.toml`. The endpoint fronts our Helius key, so an unlimited public URL
+is an unlimited bill. Repeat views of the same token are served from cache and
+never reach the limiter. There is no binding in local development, which is
+correct — there is nobody else on localhost.
 
 ## Extension
 
