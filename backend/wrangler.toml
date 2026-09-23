@@ -7,12 +7,17 @@ compatibility_flags = ["nodejs_compat"]
 #   npx wrangler secret put HELIUS_API_KEY
 # Locally it lives in backend/.dev.vars (git-ignored).
 
-# Per-mint response cache, TTL from config.ts (CACHE.ttlSeconds).
-# Create with: npx wrangler kv namespace create CACHE
-# then paste the id below. The Worker runs without it, just uncached.
-# [[kv_namespaces]]
-# binding = "CACHE"
-# id = "replace-me"
+# Holds two things under separate key prefixes:
+#   analyze:*  per-token responses, TTL from config.ts (CACHE.ttlSeconds)
+#   launch:*   launch facts, stored permanently — see chains/types.ts
+#
+# `wrangler dev` ignores the id and keeps this in .wrangler/state locally, so
+# the binding works out of the box. Before deploying, create a real namespace
+# and paste its id here:
+#   npx wrangler kv namespace create CACHE
+[[kv_namespaces]]
+binding = "CACHE"
+id = "local-dev-placeholder"
 
 [observability]
 enabled = true
