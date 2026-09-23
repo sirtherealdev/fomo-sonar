@@ -27,7 +27,7 @@ is auditable in an afternoon:
 ```
 /shared      API response types, shared by both sides
 /backend     Cloudflare Worker (Hono) + CLI validation harness
-/extension   WXT extension (not started yet)
+/extension   WXT extension (MV3, content script)
 ```
 
 ## Backend
@@ -71,6 +71,39 @@ npx wrangler kv namespace create CACHE   # paste the id into wrangler.toml
 npx wrangler secret put HELIUS_API_KEY
 npx wrangler deploy
 ```
+
+## Extension
+
+```bash
+npm run dev:ext                 # loads an unpacked build with hot reload
+npm test -w @scope/extension    # mint-extraction tests
+```
+
+The generated manifest is deliberately tiny — this is the whole of it:
+
+```json
+{
+  "manifest_version": 3,
+  "permissions": ["storage"],
+  "content_scripts": [{ "matches": ["https://fomo.family/*"], "run_at": "document_idle" }]
+}
+```
+
+`storage` holds the panel position and collapsed state. It cannot be
+localStorage: on a Fomo page that *is* Fomo's localStorage, which we promised
+never to touch. There are no `host_permissions` — the content script's own
+match covers the page, and the backend is reached over ordinary CORS.
+
+Two implementation notes that are load-bearing for the trust story:
+
+- **No monkey-patching.** Fomo is an SPA, and the usual way to follow its
+  navigation is to wrap `history.pushState`. That object is shared with the
+  page, so we poll `location.href` instead
+  ([navigation.ts](extension/lib/navigation.ts)). Invisible to the page, and
+  it cannot break trading.
+- **Reading the mint is URL-first** ([mint.ts](extension/lib/mint.ts)). Only
+  when the route does not carry the address do we fall back to read-only DOM
+  queries over outbound explorer links.
 
 ## How the detection works
 
