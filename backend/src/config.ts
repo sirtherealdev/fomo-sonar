@@ -197,10 +197,11 @@ export const LIMITS = {
    * the parallel batch, and the combined burst trips the provider's limit.
    * This evenly spaces every outbound request instead.
    *
-   * Helius allows 10 rps on the free plan and 50 on Developer. 8 leaves
-   * headroom for retries without leaving throughput on the table.
+   * Helius allows 10 rps on the free plan and 50 on Developer. We run at the
+   * free-plan ceiling; 429s are retried with backoff, so overshooting costs
+   * latency rather than correctness.
    */
-  maxRequestsPerSecond: 8,
+  maxRequestsPerSecond: 10,
 
   /**
    * Block scanning — the fallback that reads a launch directly instead of
@@ -215,8 +216,16 @@ export const LIMITS = {
   blockScanWidenAttempts: 3,
   /** Hard cap on slots read forward from the launch. 25 slots ~= 10 seconds. */
   blockScanMaxBlocks: 25,
-  /** Blocks in flight at once. Each one held in memory is several megabytes. */
-  blockScanConcurrency: 4,
+  /**
+   * Blocks in flight at once.
+   *
+   * This is the main lever on how long a block scan takes: the requests are
+   * latency-bound, not rate-bound, so fewer in flight simply means waiting.
+   * Bounded by memory rather than quota — a block is ~600 KB compressed but
+   * several megabytes parsed, and they are discarded as soon as they are
+   * filtered.
+   */
+  blockScanConcurrency: 6,
   /** Times the slot bracket may widen before we give up locating the moment. */
   blockScanBracketAttempts: 4,
   /**
@@ -225,6 +234,15 @@ export const LIMITS = {
    * immediately costs only the first chunk.
    */
   blockScanForwardSearchSlots: 48,
+  /**
+   * Total blocks a single scan may read, across searching and reading.
+   *
+   * Bounds the worst case. Measured without it, a token whose launch could not
+   * be proven spent seventy blocks and forty seconds to conclude nothing —
+   * failure cost more than success.
+   */
+  blockScanTotalBlocks: 45,
+
 
   /**
    * Per-request retries on 429/5xx, with exponential backoff

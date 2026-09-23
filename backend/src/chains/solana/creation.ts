@@ -36,7 +36,30 @@ const NOT_FOUND: CreationResult = {
   truncated: true,
 };
 
-export async function findCreation(client: HeliusClient, mint: string): Promise<CreationResult> {
+/**
+ * Can a backwards walk plausibly reach the launch inside our page budget?
+ *
+ * Projects from the time span of the first page: if a thousand signatures
+ * covered a minute, a week-old token needs ten thousand pages, and we should
+ * not spend thirty calls discovering that.
+ */
+function withinReach(firstPage: SignatureInfo[], launchHintSeconds: number): boolean {
+  const newest = firstPage[0]?.blockTime;
+  const oldest = firstPage[firstPage.length - 1]?.blockTime;
+  if (!newest || !oldest || newest <= oldest) return true; // Unknown: try anyway.
+
+  const secondsPerPage = newest - oldest;
+  const secondsToCover = newest - launchHintSeconds;
+  if (secondsToCover <= 0) return true;
+
+  return secondsToCover / secondsPerPage <= LIMITS.maxSignaturePages;
+}
+
+export async function findCreation(
+  client: HeliusClient,
+  mint: string,
+  launchHintSeconds: number | null = null,
+): Promise<CreationResult> {
   const pages: SignatureInfo[] = [];
   let before: string | undefined;
   let reachedStart = false;
@@ -49,6 +72,16 @@ export async function findCreation(client: HeliusClient, mint: string): Promise<
     if (batch.length < 1000) {
       reachedStart = true;
       break;
+    }
+
+    /*
+     * After the first full page we know this token's transaction rate, and if
+     * we also know roughly when it launched we know whether this walk can
+     * finish. When it cannot, stop now rather than spending the whole page
+     * budget proving it — the block scan will read the launch instead.
+     */
+    if (page === 0 && launchHintSeconds !== null && !withinReach(batch, launchHintSeconds)) {
+      return NOT_FOUND;
     }
     before = batch[batch.length - 1]?.signature;
     if (!before) {

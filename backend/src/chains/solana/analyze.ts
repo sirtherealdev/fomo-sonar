@@ -41,6 +41,7 @@ import type {
   FundingCluster,
   SecurityInfo,
   TokenInfo,
+  Unavailable,
 } from '@scope/shared';
 
 export async function analyzeMint(
@@ -62,12 +63,21 @@ export async function analyzeMint(
   // token whose history has already outrun our signature cap.
   const cachedLaunch = await cache?.get('solana', mint).catch(() => null);
 
-  const [creation, holderMap, topHolders, metadata, marketResult] = await Promise.all([
-    cachedLaunch ? null : findCreation(client, mint),
+  /*
+   * The launch hint has to be fetched before the history walk so the walk can
+   * tell whether it is worth starting. Market data is a separate service and
+   * costs us no Helius quota, so this ordering is free.
+   */
+  const marketResult = await fetchMarket('solana', mint);
+  const launchHint = marketResult.market?.firstPairCreatedAt
+    ? Math.floor(new Date(marketResult.market.firstPairCreatedAt).getTime() / 1000)
+    : null;
+
+  const [creation, holderMap, topHolders, metadata] = await Promise.all([
+    cachedLaunch ? null : findCreation(client, mint, launchHint),
     buildHolderMap(client, mint),
     getTopHolders(client, mint, supply),
     client.getAssetMetadata(mint),
-    fetchMarket('solana', mint),
   ]);
 
 
@@ -79,53 +89,6 @@ export async function analyzeMint(
   if (!marketResult.market) {
     baseWarnings.push('No DEX pool found for this token, so price and liquidity are unavailable.');
   }
-
-  const launch =
-    cachedLaunch ??
-    (await readLaunch(
-      client,
-      mint,
-      creation,
-      marketResult.market?.firstPairCreatedAt ?? null,
-    ));
-
-  if (launch && !cachedLaunch) {
-    // Fire and forget: a cache write must never delay or fail a response.
-    void cache?.put('solana', mint, launch).catch(() => {});
-  }
-  if (!launch) {
-    baseWarnings.push(
-      'This token has traded too much to reach its launch, and we could not locate it from market data either. Dev, bundler and sniper detection are unavailable.',
-    );
-  } else if (launch.source === 'block-scan') {
-    baseWarnings.push(
-      'Launch read by scanning the blocks around it, because the token has too much history to walk back through.',
-    );
-  }
-  if (launch?.truncated) {
-    baseWarnings.push(
-      `More than ${LIMITS.maxEarlyTransactions} transactions in the launch window; bundler and sniper counts are a lower bound.`,
-    );
-  }
-
-  const bundlerSet = new Set<string>(launch?.bundlers ?? []);
-  const sniperSet = new Set<string>(launch?.snipers ?? []);
-
-  // --- Wallets worth the per-wallet RPC cost --------------------------------
-  // Holding-weighted: a bundler sitting on 4% of supply matters, one holding
-  // dust does not, and we only have budget for LIMITS.maxFreshWalletChecks.
-  const dev = launch?.dev ?? null;
-  const candidates = [
-    ...new Set([...topHolders.list.map((h) => h.address), ...bundlerSet, ...sniperSet]),
-  ].filter((wallet) => wallet !== dev);
-
-  const ranked = candidates
-    .sort((a, b) => Number((holderMap.balances.get(b) ?? 0n) - (holderMap.balances.get(a) ?? 0n)))
-    .slice(0, LIMITS.maxFreshWalletChecks - (dev ? 1 : 0));
-
-  // The dev always gets profiled, whatever it holds: insider detection needs to
-  // know who funded it.
-  const interesting = dev ? [dev, ...ranked] : ranked;
 
   // On Solana the question "can anyone change the rules" is answered by the
   // two authorities on the mint account. Both null is the safe state.
@@ -146,18 +109,52 @@ export async function analyzeMint(
     socials: marketResult.token.socials ?? [],
   };
 
-  /**
-   * Assemble a response from whatever we know.
+  /*
+   * Three phases, because the work is wildly unequal.
    *
-   * Called twice: once with no wallet profiles (the partial, which carries
-   * every signal that does not need a per-wallet lookup — 82 of the 100
-   * scoring weight, for about a third of the time), and once with them.
-   * One assembly path, so the two phases cannot drift apart.
+   * Holders, concentration and the authority checks are ready in a couple of
+   * seconds. Reading the launch can take thirty when the history has to be
+   * scanned block by block. Per-wallet profiling costs more calls than
+   * everything else combined. Emitting a report after each means the panel
+   * shows a real score almost immediately and fills in rather than waiting for
+   * the slowest part.
    */
-  const build = (profiles: Map<string, WalletProfile> | null): AnalyzeResponse => {
-    const phase = profiles ? 'final' : 'partial';
+  type LaunchState = { status: 'pending' } | { status: 'ready'; launch: StoredLaunch | null };
+
+  const build = (
+    launchState: LaunchState,
+    profiles: Map<string, WalletProfile> | null,
+  ): AnalyzeResponse => {
+    const launch = launchState.status === 'ready' ? launchState.launch : null;
+    const launchPending = launchState.status === 'pending';
+    const phase = launchState.status === 'ready' && profiles ? 'final' : 'partial';
     const warnings = [...baseWarnings];
     const now = Math.floor(Date.now() / 1000);
+
+    if (!launchPending) {
+      if (!launch) {
+        warnings.push(
+          'This token has traded too much to reach its launch, and we could not locate it from market data either. Dev, bundler and sniper detection are unavailable.',
+        );
+      } else if (launch.source === 'block-scan') {
+        warnings.push(
+          'Launch read by scanning the blocks around it, because the token has too much history to walk back through.',
+        );
+      }
+      if (launch?.truncated) {
+        warnings.push(
+          `More than ${LIMITS.maxEarlyTransactions} transactions in the launch window; bundler and sniper counts are a lower bound.`,
+        );
+      }
+    }
+
+    const bundlerSet = new Set<string>(launch?.bundlers ?? []);
+    const sniperSet = new Set<string>(launch?.snipers ?? []);
+    const dev = launch?.dev ?? null;
+
+    const candidates = [
+      ...new Set([...topHolders.list.map((h) => h.address), ...bundlerSet, ...sniperSet]),
+    ].filter((wallet) => wallet !== dev);
 
     if (profiles && candidates.length > LIMITS.maxFreshWalletChecks) {
       warnings.push(
@@ -165,7 +162,12 @@ export async function analyzeMint(
       );
     }
 
-    const devReport = buildDevReport(launch, decimals, holderMap, supply);
+    /** Nothing measured yet, versus measured and genuinely absent. */
+    const missing = (): Unavailable => (launchPending ? 'pending' : 'creation-not-found');
+
+    const devReport: DevReport = launch
+      ? buildDevReport(launch, decimals, holderMap, supply)
+      : { address: null, holdingPct: 0, soldPct: 0, unavailable: missing() };
 
     // How much of the supply a wallet set took at launch, whatever it holds now.
     const boughtPctOf = (wallets: Iterable<string>): number => {
@@ -182,13 +184,7 @@ export async function analyzeMint(
           // Clusters need funding data, which only the profiling pass has.
           clusters: profiles ? buildClusters(bundlerSet, profiles, holderMap, supply) : [],
         }
-      : {
-          walletCount: 0,
-          holdingPct: 0,
-          boughtPct: 0,
-          clusters: [],
-          unavailable: 'creation-not-found',
-        };
+      : { walletCount: 0, holdingPct: 0, boughtPct: 0, clusters: [], unavailable: missing() };
 
     const snipers: CountAndHolding = launch
       ? {
@@ -196,11 +192,12 @@ export async function analyzeMint(
           holdingPct: holdingPctOf(sniperSet, holderMap, supply).pct,
           boughtPct: boughtPctOf(sniperSet),
         }
-      : { count: 0, holdingPct: 0, boughtPct: null, unavailable: 'creation-not-found' };
+      : { count: 0, holdingPct: 0, boughtPct: null, unavailable: missing() };
 
     // The dev is reported on its own line, never folded into the fresh count.
+    const rankedWallets = candidates.filter((wallet) => wallet !== dev);
     const freshAddresses = profiles
-      ? ranked.filter((address) => isFreshWallet(profiles.get(address), now))
+      ? rankedWallets.filter((address) => isFreshWallet(profiles.get(address), now))
       : [];
 
     const freshWallets: CountAndHolding = profiles
@@ -212,7 +209,7 @@ export async function analyzeMint(
       : { count: 0, holdingPct: 0, boughtPct: null, unavailable: 'pending' };
 
     const insiders: CountAndHolding = profiles
-      ? findInsiders(dev, ranked, profiles, holderMap, supply)
+      ? findInsiders(dev, rankedWallets, profiles, holderMap, supply)
       : { count: 0, holdingPct: 0, boughtPct: null, unavailable: 'pending' };
 
     // Label top holders that look like infrastructure rather than people.
@@ -234,7 +231,6 @@ export async function analyzeMint(
       );
     }
 
-    // --- Score --------------------------------------------------------------
     const factorInputs: FactorInputs = {
       devHolding: devReport.unavailable ? null : devReport.holdingPct,
       devSold: devReport.unavailable ? null : devReport.soldPct,
@@ -279,6 +275,7 @@ export async function analyzeMint(
         decimals,
         createdAt: launch ? new Date(launch.timestamp * 1000).toISOString() : null,
         creationSignature: launch?.signature ?? null,
+        launchSource: launch?.source ?? null,
         rpcCalls: client.calls,
         durationMs: Date.now() - startedAt,
         partial: warnings.length > 0 || factors.length < Object.keys(factorInputs).length,
@@ -286,11 +283,37 @@ export async function analyzeMint(
     };
   };
 
-  // Everything above this line is done; hand it over before paying for the
-  // per-wallet pass, which costs more than all of it put together.
-  onPartial?.(build(null));
+  // Phase 1: concentration and authorities, ready in a couple of seconds.
+  onPartial?.(build({ status: 'pending' }, null));
 
-  return build(await profileWallets(client, interesting));
+  // Phase 2: the launch — cheap when the history is short, slow when it has to
+  // be scanned block by block, which is exactly why it is not in phase 1.
+  const launch = cachedLaunch ?? (await readLaunch(client, mint, creation, launchHint));
+  if (launch && !cachedLaunch) {
+    // Fire and forget: a cache write must never delay or fail a response.
+    void cache?.put('solana', mint, launch).catch(() => {});
+  }
+  const launchState: LaunchState = { status: 'ready', launch };
+  onPartial?.(build(launchState, null));
+
+  // Phase 3: per-wallet profiling, which costs more calls than the rest together.
+  const dev = launch?.dev ?? null;
+  const ranked = [
+    ...new Set([
+      ...topHolders.list.map((h) => h.address),
+      ...(launch?.bundlers ?? []),
+      ...(launch?.snipers ?? []),
+    ]),
+  ]
+    .filter((wallet) => wallet !== dev)
+    .sort((a, b) => Number((holderMap.balances.get(b) ?? 0n) - (holderMap.balances.get(a) ?? 0n)))
+    .slice(0, LIMITS.maxFreshWalletChecks - (dev ? 1 : 0));
+
+  // The dev always gets profiled, whatever it holds: insider detection needs to
+  // know who funded it.
+  const interesting = dev ? [dev, ...ranked] : ranked;
+
+  return build(launchState, await profileWallets(client, interesting));
 }
 
 /**
@@ -308,7 +331,7 @@ async function readLaunch(
   client: HeliusClient,
   mint: string,
   creation: CreationResult | null,
-  pairCreatedAt: string | null,
+  launchHint: number | null,
 ): Promise<StoredLaunch | null> {
   if (creation?.found && creation.dev) {
     return buildLaunch(
@@ -328,12 +351,9 @@ async function readLaunch(
    * blocks there directly. This is the only path that works on a token that
    * has already traded heavily.
    */
-  if (!pairCreatedAt) return null;
+  if (launchHint === null) return null;
 
-  const hint = Math.floor(new Date(pairCreatedAt).getTime() / 1000);
-  if (!Number.isFinite(hint)) return null;
-
-  const scan = await scanLaunchFromBlocks(client, mint, hint);
+  const scan = await scanLaunchFromBlocks(client, mint, launchHint);
   if (!scan) return null;
 
   const early = await readEarlyWindow(
