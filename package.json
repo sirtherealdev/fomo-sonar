@@ -1,0 +1,13 @@
+{
+  "name": "scope-scanner",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Read-only token risk overlay for Fomo Web",
+  "workspaces": ["shared", "backend"],
+  "scripts": {
+    "analyze": "npm run analyze -w @scope/backend --",
+    "dev:api": "npm run dev -w @scope/backend",
+    "typecheck": "npm run typecheck -w @scope/shared && npm run typecheck -w @scope/backend"
+  },
+  "engines": { "node": ">=20" }
+}

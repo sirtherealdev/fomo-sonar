@@ -1,0 +1,18 @@
+name = "scope-scanner-api"
+main = "src/index.ts"
+compatibility_date = "2024-12-30"
+compatibility_flags = ["nodejs_compat"]
+
+# HELIUS_API_KEY is a secret, never a var:
+#   npx wrangler secret put HELIUS_API_KEY
+# Locally it lives in backend/.dev.vars (git-ignored).
+
+# Per-mint response cache, TTL from config.ts (CACHE.ttlSeconds).
+# Create with: npx wrangler kv namespace create CACHE
+# then paste the id below. The Worker runs without it, just uncached.
+# [[kv_namespaces]]
+# binding = "CACHE"
+# id = "replace-me"
+
+[observability]
+enabled = true
