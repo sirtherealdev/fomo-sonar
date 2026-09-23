@@ -154,9 +154,15 @@ function score(data: AnalyzeResponse): HTMLElement {
   bar.append(fill);
 
   const meta = el('div', 'meta');
-  // Naming the strongest contributor turns a number into a reason.
+  // Naming the reason turns a number into something actionable. A forced floor
+  // is always the reason when there is one: it is what set the score.
   const top = [...data.factors].sort((a, b) => b.points - a.points)[0];
-  meta.append(bar, el('div', 'caption', top ? `driven by ${factorLabel(top.key)}` : 'risk score'));
+  const reason = data.scoreFloor
+    ? `${factorLabel(data.scoreFloor.key)} alone`
+    : top
+      ? `driven by ${factorLabel(top.key)}`
+      : 'risk score';
+  meta.append(bar, el('div', 'caption', reason));
 
   wrap.append(number, meta);
   return wrap;

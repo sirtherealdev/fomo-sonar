@@ -100,6 +100,11 @@ function printReport(r: AnalyzeResponse): void {
 
   // --- Risk strip -----------------------------------------------------------
   console.log(`  ${BOLD}risk        ${color}${r.riskScore}/100 ${r.riskLevel}${RESET}`);
+  if (r.scoreFloor) {
+    console.log(
+      `              ${DIM}floor ${r.scoreFloor.floor} forced by ${r.scoreFloor.key} at ${r.scoreFloor.value}%${RESET}`,
+    );
+  }
   console.log(
     `  created     ${r.meta.createdAt ?? 'unknown'}  ${DIM}${r.meta.creationSignature?.slice(0, 12) ?? ''}${RESET}`,
   );

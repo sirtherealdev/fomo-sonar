@@ -153,6 +153,15 @@ export interface MarketInfo {
   source: 'dexscreener';
 }
 
+/** Set when a single signal was severe enough to set a minimum risk score. */
+export interface ScoreFloor {
+  key: RiskFactor['key'];
+  /** The measured value that triggered it. */
+  value: number;
+  /** The minimum score it forced. */
+  floor: number;
+}
+
 export interface AnalyzeMeta {
   /** Total supply in base units. */
   supply: string;
@@ -192,6 +201,8 @@ export interface AnalyzeResponse {
   /** Human-readable caveats. Never empty when meta.partial is true. */
   warnings: string[];
   factors: RiskFactor[];
+  /** Non-null when one signal alone set the floor for riskScore. */
+  scoreFloor: ScoreFloor | null;
   meta: AnalyzeMeta;
 }
 

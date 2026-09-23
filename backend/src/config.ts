@@ -89,6 +89,36 @@ export const SCORING = {
     authorities: { safe: 0, danger: 100 },
   },
 
+  /**
+   * Floors: one catastrophic signal cannot be averaged away.
+   *
+   * A weighted sum over eight factors has a structural flaw — if bundled
+   * wallets hold half the supply but everything else looks fine, the average
+   * lands in "medium" and the panel reassures someone it should be warning.
+   *
+   * So: if a factor's measured value reaches `atLeast`, the final score cannot
+   * fall below `floor`, whatever the other factors say. The weighted sum still
+   * decides everything below that line.
+   */
+  criticalFloors: {
+    /** Same-slot wallets holding a quarter of the supply. */
+    bundles: { atLeast: 25, floor: 72 },
+    /** Ten wallets holding half the supply. */
+    topHolders: { atLeast: 50, floor: 70 },
+    /** The dev still sitting on a sixth of the supply. */
+    devHolding: { atLeast: 15, floor: 68 },
+    /** Launch snipers holding a third of the supply. */
+    snipers: { atLeast: 30, floor: 66 },
+    /** Dev-linked wallets holding a sixth of the supply. */
+    insiders: { atLeast: 15, floor: 66 },
+    /** Brand-new wallets holding two fifths of the supply. */
+    freshWallets: { atLeast: 40, floor: 62 },
+    /** The dev has emptied its allocation. */
+    devSold: { atLeast: 90, floor: 55 },
+    /** Mint authority is live: the supply you see is not final. */
+    authorities: { atLeast: 100, floor: 75 },
+  },
+
   /** Score thresholds for the three-band label. */
   levels: { mediumAt: 35, highAt: 65 },
 } as const;
@@ -112,6 +142,17 @@ export const LIMITS = {
   maxFreshWalletChecks: 40,
 
   /**
+   * Signatures fetched per wallet when profiling it.
+   *
+   * This costs the same single RPC call at 20 as at 1000 — only the response
+   * is bigger — so ask for the maximum. It matters: below this many lifetime
+   * transactions we learn the wallet's exact age and activity; above it we
+   * learn nothing but "busy". At 20 we were blind to any wallet that had
+   * traded more than twenty times, including wallets created an hour ago.
+   */
+  walletHistoryPageSize: 1000,
+
+  /**
    * Parallel in-flight Helius requests.
    *
    * The Helius free plan allows 10 requests/sec, so 5 leaves headroom for the
@@ -122,9 +163,25 @@ export const LIMITS = {
    */
   concurrency: 5,
 
-  /** Per-request retries on 429/5xx, with exponential backoff. */
-  maxRetries: 3,
-  retryBaseDelayMs: 250,
+  /**
+   * Request spacing, in requests per second.
+   *
+   * Limiting concurrency alone is not enough: sequential calls run alongside
+   * the parallel batch, and the combined burst trips the provider's limit.
+   * This evenly spaces every outbound request instead.
+   *
+   * Helius allows 10 rps on the free plan and 50 on Developer. 8 leaves
+   * headroom for retries without leaving throughput on the table.
+   */
+  maxRequestsPerSecond: 8,
+
+  /**
+   * Per-request retries on 429/5xx, with exponential backoff
+   * (400ms, 800ms, 1.6s, 3.2s, 6.4s). Sustained rate limiting needs a budget
+   * this long; three short retries just fail slower.
+   */
+  maxRetries: 5,
+  retryBaseDelayMs: 400,
 } as const;
 
 export const CACHE = {
