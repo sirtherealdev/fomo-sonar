@@ -112,7 +112,7 @@ function printReport(r: AnalyzeResponse): void {
     `  dev         ${short(r.dev.address)}  holds ${pct(r.dev.holdingPct)}  sold ${pct(r.dev.soldPct)}${note(r.dev.unavailable)}`,
   );
   console.log(
-    `  bundlers    ${r.bundles.walletCount} wallets  ${pct(r.bundles.holdingPct)}  ${r.bundles.clusters.length} funding cluster(s)${note(r.bundles.unavailable)}`,
+    `  bundlers    ${r.bundles.walletCount} wallets  bought ${pct(r.bundles.boughtPct)}  hold ${pct(r.bundles.holdingPct)}  ${r.bundles.clusters.length} cluster(s)${note(r.bundles.unavailable)}`,
   );
   for (const cluster of r.bundles.clusters.slice(0, 3)) {
     console.log(
@@ -123,10 +123,11 @@ function printReport(r: AnalyzeResponse): void {
     `  top 10      ${pct(r.topHolders.top10Pct)}  ${DIM}(${r.topHolders.excluded.length} pool/program accounts excluded)${RESET}`,
   );
   for (const holder of r.topHolders.list.slice(0, 5)) {
-    console.log(`                ${DIM}${short(holder.address)}  ${pct(holder.pct)}${RESET}`);
+    const label = holder.highActivity ? '  high-activity (exchange/protocol?)' : '';
+    console.log(`                ${DIM}${short(holder.address)}  ${pct(holder.pct)}${label}${RESET}`);
   }
   console.log(
-    `  snipers     ${r.snipers.count} wallets  ${pct(r.snipers.holdingPct)}${note(r.snipers.unavailable)}`,
+    `  snipers     ${r.snipers.count} wallets  bought ${pct(r.snipers.boughtPct ?? 0)}  hold ${pct(r.snipers.holdingPct)}${note(r.snipers.unavailable)}`,
   );
   console.log(`  insiders    ${r.insiders.count} wallets  ${pct(r.insiders.holdingPct)}${note(r.insiders.unavailable)}`);
   console.log(`  fresh       ${r.freshWallets.count} wallets  ${pct(r.freshWallets.holdingPct)}`);

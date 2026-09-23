@@ -40,6 +40,22 @@ export const DETECTION = {
   topHolderCount: 10,
 
   /**
+   * When to label a holder as high-activity — likely an exchange or protocol
+   * wallet rather than a person.
+   *
+   * Labelled, never excluded. Our structural pool test catches PDAs, but
+   * plenty of infrastructure runs on ordinary keypairs, and those would
+   * otherwise read as one whale holding most of the supply.
+   *
+   * Both conditions must hold. Activity alone is useless: an active memecoin
+   * trader has thousands of transactions, and labelling every 2% holder as a
+   * suspected exchange is noise that teaches the user to ignore the label.
+   * The label only earns its place on a position big enough to change how the
+   * concentration number reads.
+   */
+  highActivityMinPct: 15,
+
+  /**
    * Insiders: wallets the dev funded, or that funded the dev. Same-source money
    * plus a position in the token is the classic "team wallet" shape.
    */
