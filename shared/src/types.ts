@@ -12,7 +12,8 @@ export type Unavailable =
   | 'creation-not-found' // we could not walk back to the mint's first transaction
   | 'no-early-trades' // creation found, but no trades inside the analysis window
   | 'no-dev-allocation' // dev never held any of the supply, so "sold %" is meaningless
-  | 'holder-set-partial'; // holder pagination hit its cap, percentages would understate
+  | 'holder-set-partial' // holder pagination hit its cap, percentages would understate
+  | 'no-market-data'; // the token is not indexed on any DEX we can read
 
 export interface HolderEntry {
   /** Wallet that owns the token account, not the token account itself. */
@@ -70,7 +71,15 @@ export interface CountAndHolding {
 
 /** Per-component contribution to the risk score, so the UI can explain the number. */
 export interface RiskFactor {
-  key: 'devHolding' | 'devSold' | 'bundles' | 'topHolders' | 'snipers' | 'freshWallets';
+  key:
+    | 'devHolding'
+    | 'devSold'
+    | 'bundles'
+    | 'topHolders'
+    | 'snipers'
+    | 'freshWallets'
+    | 'insiders'
+    | 'authorities';
   /** The measured percentage this factor scored on. */
   value: number;
   /** 0..1 after the safe→danger ramp. */
@@ -79,6 +88,44 @@ export interface RiskFactor {
   weight: number;
   /** Points this factor added to the final 0..100 score. */
   points: number;
+}
+
+/** Identity, for the panel header. */
+export interface TokenInfo {
+  name: string | null;
+  symbol: string | null;
+  imageUrl: string | null;
+  websites: string[];
+  socials: { type: string; url: string }[];
+}
+
+/**
+ * Authority checks. `null` on an authority field means revoked, which is the
+ * safe state: nobody can mint more supply / freeze your balance.
+ */
+export interface SecurityInfo {
+  mintAuthority: string | null;
+  freezeAuthority: string | null;
+  mintAuthorityRevoked: boolean;
+  freezeAuthorityRevoked: boolean;
+}
+
+/** Headline market numbers. Third-party data, so every field can be null. */
+export interface MarketInfo {
+  priceUsd: number | null;
+  marketCapUsd: number | null;
+  fdvUsd: number | null;
+  liquidityUsd: number | null;
+  volume24hUsd: number | null;
+  priceChange: { m5: number | null; h1: number | null; h6: number | null; h24: number | null };
+  txns24h: { buys: number; sells: number } | null;
+  /** Which DEX the deepest pool lives on, e.g. "raydium", "pumpswap". */
+  dexId: string | null;
+  pairAddress: string | null;
+  pairCreatedAt: string | null;
+  /** True when the team has paid for a DexScreener token profile. */
+  dexPaid: boolean | null;
+  source: 'dexscreener';
 }
 
 export interface AnalyzeMeta {
@@ -99,6 +146,11 @@ export interface AnalyzeMeta {
 
 export interface AnalyzeResponse {
   mint: string;
+  token: TokenInfo;
+  market: MarketInfo | null;
+  security: SecurityInfo;
+  /** Number of wallets holding a non-zero balance. */
+  holderCount: number;
   /** 0..100, higher is riskier. */
   riskScore: number;
   riskLevel: RiskLevel;
@@ -107,6 +159,8 @@ export interface AnalyzeResponse {
   topHolders: TopHolderReport;
   snipers: CountAndHolding;
   freshWallets: CountAndHolding;
+  /** Wallets the dev funded, or that funded the dev. */
+  insiders: CountAndHolding;
   analyzedAt: string;
   /** Human-readable caveats. Never empty when meta.partial is true. */
   warnings: string[];

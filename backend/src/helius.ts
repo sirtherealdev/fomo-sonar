@@ -27,9 +27,21 @@ export interface SignatureInfo {
   err: unknown | null;
 }
 
-export interface TokenSupply {
-  amount: string;
+/** The SPL mint account, parsed. Supply, decimals and both authorities in one call. */
+export interface MintAccount {
+  supply: string;
   decimals: number;
+  /** null means revoked: nobody can mint more. */
+  mintAuthority: string | null;
+  /** null means revoked: nobody can freeze balances. */
+  freezeAuthority: string | null;
+}
+
+/** DAS metadata, narrowed to the fields the panel header needs. */
+export interface AssetMetadata {
+  name: string | null;
+  symbol: string | null;
+  imageUrl: string | null;
 }
 
 export interface LargestAccount {
@@ -146,9 +158,62 @@ export class HeliusClient {
 
   // --- Convenience wrappers -------------------------------------------------
 
-  async getTokenSupply(mint: string): Promise<TokenSupply> {
-    const res = await this.rpc<{ value: TokenSupply }>('getTokenSupply', [mint]);
-    return res.value;
+  /**
+   * One call for supply, decimals and the two authorities. Cheaper than
+   * getTokenSupply + a separate authority lookup, and the authorities are two
+   * of the headline safety checks.
+   */
+  async getMintAccount(mint: string): Promise<MintAccount> {
+    const res = await this.rpc<{
+      value: {
+        data?: {
+          parsed?: {
+            info?: {
+              supply?: string;
+              decimals?: number;
+              mintAuthority?: string | null;
+              freezeAuthority?: string | null;
+            };
+          };
+        };
+      } | null;
+    }>('getAccountInfo', [mint, { encoding: 'jsonParsed' }]);
+
+    const info = res.value?.data?.parsed?.info;
+    if (!info || info.supply === undefined || info.decimals === undefined) {
+      throw new HeliusError(`${mint} is not an SPL mint account`);
+    }
+
+    return {
+      supply: info.supply,
+      decimals: info.decimals,
+      mintAuthority: info.mintAuthority ?? null,
+      freezeAuthority: info.freezeAuthority ?? null,
+    };
+  }
+
+  /**
+   * DAS metadata. Best-effort: tokens that predate DAS indexing, or that were
+   * created seconds ago, can 404 here. Returns nulls rather than throwing,
+   * because a missing token name must never fail a risk report.
+   */
+  async getAssetMetadata(mint: string): Promise<AssetMetadata> {
+    try {
+      const asset = await this.rpc<{
+        content?: {
+          metadata?: { name?: string; symbol?: string };
+          links?: { image?: string };
+        };
+      }>('getAsset', { id: mint, displayOptions: { showFungible: true } });
+
+      return {
+        name: asset.content?.metadata?.name ?? null,
+        symbol: asset.content?.metadata?.symbol ?? null,
+        imageUrl: asset.content?.links?.image ?? null,
+      };
+    } catch {
+      return { name: null, symbol: null, imageUrl: null };
+    }
   }
 
   async getSignatures(address: string, before?: string, limit = 1000): Promise<SignatureInfo[]> {

@@ -53,8 +53,31 @@ async function main(): Promise<void> {
 
 function printReport(r: AnalyzeResponse): void {
   const color = COLORS[r.riskLevel];
-  console.log(`\n${BOLD}${r.mint}${RESET}`);
-  console.log(`  risk        ${color}${r.riskScore}/100 ${r.riskLevel}${RESET}`);
+  const name = r.token.symbol ? `${r.token.name ?? r.token.symbol} (${r.token.symbol})` : r.mint;
+
+  console.log(`\n${BOLD}${name}${RESET}  ${DIM}${r.mint}${RESET}`);
+
+  // --- Headline strip -------------------------------------------------------
+  const m = r.market;
+  if (m) {
+    console.log(
+      `  price       ${usd(m.priceUsd, 8)}  ${change(m.priceChange.h24)} 24h   ${DIM}${change(m.priceChange.m5)} 5m  ${change(m.priceChange.h1)} 1h${RESET}`,
+    );
+    console.log(
+      `  mcap        ${usd(m.marketCapUsd)}   liq ${usd(m.liquidityUsd)}   vol24h ${usd(m.volume24hUsd)}`,
+    );
+    console.log(
+      `  market      ${m.dexId ?? '?'}  ${m.txns24h ? `${m.txns24h.buys}B / ${m.txns24h.sells}S 24h` : ''}  ${DIM}dex paid: ${yesNo(m.dexPaid)}${RESET}`,
+    );
+  } else {
+    console.log(`  market      ${DIM}no DEX pool found${RESET}`);
+  }
+  console.log(
+    `  holders     ${r.holderCount}   mint auth ${flag(r.security.mintAuthorityRevoked)}   freeze auth ${flag(r.security.freezeAuthorityRevoked)}`,
+  );
+
+  // --- Risk strip -----------------------------------------------------------
+  console.log(`  ${BOLD}risk        ${color}${r.riskScore}/100 ${r.riskLevel}${RESET}`);
   console.log(
     `  created     ${r.meta.createdAt ?? 'unknown'}  ${DIM}${r.meta.creationSignature?.slice(0, 12) ?? ''}${RESET}`,
   );
@@ -69,20 +92,57 @@ function printReport(r: AnalyzeResponse): void {
       `                ${DIM}${short(cluster.funder)} funded ${cluster.wallets.length} wallets holding ${pct(cluster.holdingPct)}${RESET}`,
     );
   }
-  console.log(`  top 10      ${pct(r.topHolders.top10Pct)}  ${DIM}(${r.topHolders.excluded.length} pool/program accounts excluded)${RESET}`);
+  console.log(
+    `  top 10      ${pct(r.topHolders.top10Pct)}  ${DIM}(${r.topHolders.excluded.length} pool/program accounts excluded)${RESET}`,
+  );
   for (const holder of r.topHolders.list.slice(0, 5)) {
     console.log(`                ${DIM}${short(holder.address)}  ${pct(holder.pct)}${RESET}`);
   }
-  console.log(`  snipers     ${r.snipers.count} wallets  ${pct(r.snipers.holdingPct)}${note(r.snipers.unavailable)}`);
+  console.log(
+    `  snipers     ${r.snipers.count} wallets  ${pct(r.snipers.holdingPct)}${note(r.snipers.unavailable)}`,
+  );
+  console.log(`  insiders    ${r.insiders.count} wallets  ${pct(r.insiders.holdingPct)}${note(r.insiders.unavailable)}`);
   console.log(`  fresh       ${r.freshWallets.count} wallets  ${pct(r.freshWallets.holdingPct)}`);
 
   console.log(`  ${DIM}factors${RESET}`);
   for (const f of r.factors) {
-    console.log(`                ${DIM}${f.key.padEnd(13)} ${String(f.value).padStart(6)}%  -> ${String(f.points).padStart(5)} pts (weight ${f.weight})${RESET}`);
+    console.log(
+      `                ${DIM}${f.key.padEnd(13)} ${String(f.value).padStart(6)}%  -> ${String(f.points).padStart(5)} pts (weight ${f.weight})${RESET}`,
+    );
   }
 
   for (const warning of r.warnings) console.log(`  ${COLORS.medium}!${RESET} ${warning}`);
   console.log(`  ${DIM}${r.meta.rpcCalls} helius calls, ${r.meta.durationMs}ms${RESET}`);
+}
+
+function usd(value: number | null, maxDigits = 2): string {
+  if (value === null) return '—';
+  if (value >= 1000) {
+    const units = [
+      [1e9, 'B'],
+      [1e6, 'M'],
+      [1e3, 'K'],
+    ] as const;
+    for (const [size, suffix] of units) {
+      if (value >= size) return `$${(value / size).toFixed(2)}${suffix}`;
+    }
+  }
+  return `$${value.toFixed(value < 1 ? maxDigits : 2)}`;
+}
+
+function change(value: number | null): string {
+  if (value === null) return '—';
+  const color = value >= 0 ? COLORS.low : COLORS.high;
+  return `${color}${value >= 0 ? '+' : ''}${value.toFixed(2)}%${RESET}`;
+}
+
+/** Revoked authority is the safe state, so a revoked flag is the green one. */
+function flag(safe: boolean): string {
+  return safe ? `${COLORS.low}revoked${RESET}` : `${COLORS.high}LIVE${RESET}`;
+}
+
+function yesNo(value: boolean | null): string {
+  return value === null ? 'unknown' : value ? 'yes' : 'no';
 }
 
 const pct = (n: number): string => `${n.toFixed(2)}%`;

@@ -3,21 +3,28 @@
  *
  * Shape of the pipeline:
  *
- *   supply ─┐
- *   holders ─┼─ (independent, run together)
- *   creation ┘        │
- *                     └─> early window ─> bundlers / snipers
- *                                            │
- *                     top holders ───────────┴─> wallet profiles ─> fresh / clusters
+ *   mint account (supply, decimals, authorities)
+ *        │
+ *        ├─ holders ─────────────┐
+ *        ├─ top holders ─────────┤
+ *        ├─ DAS metadata ────────┤   (independent, run together)
+ *        ├─ market (DexScreener) ┤
+ *        └─ creation ────────────┤
+ *                 │              │
+ *                 └─> early window ─> bundlers / snipers
+ *                                        │
+ *                        top holders ────┴─> wallet profiles ─> fresh / insiders / clusters
  *                                                                        │
  *                                                                        └─> score
  *
  * Every detector that cannot run sets an `unavailable` reason and drops out of
- * the score instead of contributing a zero.
+ * the score instead of contributing a zero. Market data is best-effort and can
+ * be null without affecting anything else.
  */
 
 import { DETECTION, LIMITS } from '../config.ts';
 import { HeliusClient } from '../helius.ts';
+import { fetchMarket } from '../market.ts';
 import { pctOf, round2 } from '../util.ts';
 import { findCreation } from './creation.ts';
 import { analyzeEarlyWindow } from './early.ts';
@@ -30,20 +37,25 @@ import type {
   CountAndHolding,
   DevReport,
   FundingCluster,
+  SecurityInfo,
+  TokenInfo,
 } from '@scope/shared';
 
 export async function analyzeMint(client: HeliusClient, mint: string): Promise<AnalyzeResponse> {
   const startedAt = Date.now();
   const warnings: string[] = [];
 
-  const supplyInfo = await client.getTokenSupply(mint);
-  const supply = BigInt(supplyInfo.amount);
-  const decimals = supplyInfo.decimals;
+  // Supply, decimals and both authorities in one call.
+  const mintAccount = await client.getMintAccount(mint);
+  const supply = BigInt(mintAccount.supply);
+  const decimals = mintAccount.decimals;
 
-  const [creation, holderMap, topHolders] = await Promise.all([
+  const [creation, holderMap, topHolders, metadata, marketResult] = await Promise.all([
     findCreation(client, mint),
     buildHolderMap(client, mint),
     getTopHolders(client, mint, supply),
+    client.getAssetMetadata(mint),
+    fetchMarket(mint),
   ]);
 
   if (creation.truncated) {
@@ -55,6 +67,9 @@ export async function analyzeMint(client: HeliusClient, mint: string): Promise<A
     warnings.push(
       `More than ${LIMITS.maxHolderPages * 1000} holders; wallet-set percentages are a lower bound.`,
     );
+  }
+  if (!marketResult.market) {
+    warnings.push('No DEX pool found for this token, so price and liquidity are unavailable.');
   }
 
   const early = await analyzeEarlyWindow(client, mint, creation);
@@ -83,19 +98,22 @@ export async function analyzeMint(client: HeliusClient, mint: string): Promise<A
   // --- Wallets worth the per-wallet RPC cost --------------------------------
   // Holding-weighted: a bundler sitting on 4% of supply matters, one holding
   // dust does not, and we only have budget for LIMITS.maxFreshWalletChecks.
-  const interesting = [
+  const candidates = [
     ...new Set([...topHolders.list.map((h) => h.address), ...bundlerSet, ...sniperSet]),
-  ]
+  ].filter((wallet) => wallet !== creation.dev);
+
+  const ranked = candidates
     .sort((a, b) => Number((holderMap.balances.get(b) ?? 0n) - (holderMap.balances.get(a) ?? 0n)))
-    .slice(0, LIMITS.maxFreshWalletChecks);
+    .slice(0, LIMITS.maxFreshWalletChecks - (creation.dev ? 1 : 0));
+
+  // The dev always gets profiled, whatever it holds: insider detection needs to
+  // know who funded it.
+  const interesting = creation.dev ? [creation.dev, ...ranked] : ranked;
 
   const profiles = await profileWallets(client, interesting);
-  if (
-    bundlerSet.size + sniperSet.size + topHolders.list.length >
-    LIMITS.maxFreshWalletChecks
-  ) {
+  if (candidates.length > LIMITS.maxFreshWalletChecks) {
     warnings.push(
-      `Only the ${LIMITS.maxFreshWalletChecks} largest wallets were checked for age and funding; fresh-wallet and cluster counts are a lower bound.`,
+      `Only the ${LIMITS.maxFreshWalletChecks} largest of ${candidates.length} notable wallets were checked for age and funding; fresh-wallet and insider counts are a lower bound.`,
     );
   }
 
@@ -116,10 +134,30 @@ export async function analyzeMint(client: HeliusClient, mint: string): Promise<A
     ? { count: sniperSet.size, holdingPct: holdingPctOf(sniperSet, holderMap, supply).pct }
     : { count: 0, holdingPct: 0, unavailable: 'creation-not-found' };
 
-  const freshAddresses = interesting.filter((address) => isFreshWallet(profiles.get(address), now));
+  // The dev is reported on its own line, never folded into the fresh-wallet count.
+  const freshAddresses = ranked.filter((address) => isFreshWallet(profiles.get(address), now));
   const freshWallets: CountAndHolding = {
     count: freshAddresses.length,
     holdingPct: holdingPctOf(freshAddresses, holderMap, supply).pct,
+  };
+
+  const insiders = findInsiders(creation.dev, ranked, profiles, holderMap, supply);
+
+  const security: SecurityInfo = {
+    mintAuthority: mintAccount.mintAuthority,
+    freezeAuthority: mintAccount.freezeAuthority,
+    mintAuthorityRevoked: mintAccount.mintAuthority === null,
+    freezeAuthorityRevoked: mintAccount.freezeAuthority === null,
+  };
+
+  // DexScreener carries the socials and the image the token actually ships
+  // with; DAS is the fallback for a token too new to have a pool.
+  const token: TokenInfo = {
+    name: marketResult.token.name ?? metadata.name,
+    symbol: marketResult.token.symbol ?? metadata.symbol,
+    imageUrl: marketResult.token.imageUrl ?? metadata.imageUrl,
+    websites: marketResult.token.websites ?? [],
+    socials: marketResult.token.socials ?? [],
   };
 
   // --- Score ----------------------------------------------------------------
@@ -130,14 +168,19 @@ export async function analyzeMint(client: HeliusClient, mint: string): Promise<A
     topHolders: topHolders.list.length > 0 ? topHolders.top10Pct : null,
     snipers: snipers.unavailable ? null : snipers.holdingPct,
     freshWallets: freshWallets.holdingPct,
+    insiders: insiders.unavailable ? null : insiders.holdingPct,
+    authorities: authorityRisk(security),
   };
   const { score, level, factors } = scoreRisk(factorInputs);
 
-  const partial =
-    warnings.length > 0 || factors.length < Object.keys(factorInputs).length;
+  const partial = warnings.length > 0 || factors.length < Object.keys(factorInputs).length;
 
   return {
     mint,
+    token,
+    market: marketResult.market,
+    security,
+    holderCount: holderMap.holderCount,
     riskScore: score,
     riskLevel: level,
     dev,
@@ -149,6 +192,7 @@ export async function analyzeMint(client: HeliusClient, mint: string): Promise<A
     },
     snipers,
     freshWallets,
+    insiders,
     analyzedAt: new Date().toISOString(),
     warnings,
     factors,
@@ -162,6 +206,19 @@ export async function analyzeMint(client: HeliusClient, mint: string): Promise<A
       partial,
     },
   };
+}
+
+/**
+ * Authority risk as a 0..100 input to the score.
+ *
+ * A live mint authority is the single most consequential flag on this list:
+ * the supply you are looking at is not final and can be diluted at will. A
+ * live freeze authority is milder but still means your balance can be locked.
+ */
+function authorityRisk(security: SecurityInfo): number {
+  if (!security.mintAuthorityRevoked) return 100;
+  if (!security.freezeAuthorityRevoked) return 50;
+  return 0;
 }
 
 function buildDevReport(
@@ -190,6 +247,36 @@ function buildDevReport(
 
   const sold = initial > current ? initial - current : 0n;
   return { address: creation.dev, holdingPct, soldPct: round2(pctOf(sold, initial)) };
+}
+
+/**
+ * Insiders: notable wallets whose first SOL came from the dev, plus the wallet
+ * that funded the dev if it also holds the token. One hop only — deeper graph
+ * walking costs an RPC call per wallet per hop and quickly finds nothing but
+ * exchange hot wallets.
+ */
+function findInsiders(
+  dev: string | null,
+  wallets: readonly string[],
+  profiles: Map<string, WalletProfile>,
+  holderMap: { balances: Map<string, bigint> },
+  supply: bigint,
+): CountAndHolding {
+  if (!dev) return { count: 0, holdingPct: 0, unavailable: 'creation-not-found' };
+
+  const insiders = new Set<string>();
+
+  for (const wallet of wallets) {
+    if (wallet === dev) continue;
+    if (profiles.get(wallet)?.funder === dev) insiders.add(wallet);
+  }
+
+  const devFunder = profiles.get(dev)?.funder;
+  if (devFunder && devFunder !== dev && (holderMap.balances.get(devFunder) ?? 0n) > 0n) {
+    insiders.add(devFunder);
+  }
+
+  return { count: insiders.size, holdingPct: holdingPctOf(insiders, holderMap, supply).pct };
 }
 
 /**
