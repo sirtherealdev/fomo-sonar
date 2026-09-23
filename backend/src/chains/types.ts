@@ -65,8 +65,18 @@ export interface ChainAdapter {
   /** Is this string a plausible token address on this chain? Cheap, no network. */
   isValidAddress(address: string): boolean;
 
-  /** Produce the full report. Throws ChainNotSupportedError if not implemented yet. */
-  analyze(address: string, env: AdapterEnv): Promise<AnalyzeResponse>;
+  /**
+   * Produce the full report. Throws ChainNotSupportedError if not implemented.
+   *
+   * `onPartial` is called once, as soon as everything that does not need
+   * per-wallet lookups is ready — an adapter may skip it, and a caller may
+   * ignore it. It always resolves to the complete report regardless.
+   */
+  analyze(
+    address: string,
+    env: AdapterEnv,
+    onPartial?: ((partial: AnalyzeResponse) => void) | undefined,
+  ): Promise<AnalyzeResponse>;
 }
 
 /** Thrown by an adapter that exists but cannot analyse yet. Maps to HTTP 501. */

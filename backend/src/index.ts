@@ -89,45 +89,115 @@ async function analyze(
     );
   }
 
-  const cacheKey = `analyze:v2:${chain}:${address}`;
+  const cacheKey = `analyze:v3:${chain}:${address}`;
   const cached = await env.CACHE?.get(cacheKey);
   if (cached) {
     const body = JSON.parse(cached) as AnalyzeResponse;
     body.meta.cached = true;
-    return json(body, 200);
-  }
-
-  try {
-    const result = await adapter.analyze(address, {
-      HELIUS_API_KEY: env.HELIUS_API_KEY,
-      EVM_RPC_URL: env.EVM_RPC_URL,
-      launchCache: launchCacheFrom(env.CACHE),
+    return new Response(`${JSON.stringify(body)}\n`, {
+      status: 200,
+      headers: {
+        'content-type': 'application/x-ndjson; charset=utf-8',
+        'cache-control': `public, max-age=${CACHE.ttlSeconds}`,
+      },
     });
-
-    ctx.waitUntil(
-      env.CACHE?.put(cacheKey, JSON.stringify(result), {
-        expirationTtl: Math.max(60, CACHE.ttlSeconds),
-      }) ?? Promise.resolve(),
-    );
-
-    return json(result, 200);
-  } catch (err) {
-    if (err instanceof ChainNotSupportedError) {
-      return json<ApiError>(
-        { error: 'chain_not_implemented', message: `${chain} analysis is not available yet.` },
-        501,
-      );
-    }
-    if (err instanceof HeliusError) {
-      console.error('provider error', { chain, address, message: err.message, status: err.status });
-      return json<ApiError>(
-        { error: 'upstream_error', message: 'On-chain data is temporarily unavailable.' },
-        502,
-      );
-    }
-    console.error('analysis failed', { chain, address, error: String(err) });
-    return json<ApiError>({ error: 'analysis_failed', message: 'Could not analyse this token.' }, 500);
   }
+
+  const adapterEnv = {
+    HELIUS_API_KEY: env.HELIUS_API_KEY,
+    EVM_RPC_URL: env.EVM_RPC_URL,
+    launchCache: launchCacheFrom(env.CACHE),
+  };
+
+  /*
+   * Streamed as newline-delimited JSON so the panel can render the cheap
+   * signals immediately instead of staring at a skeleton for fifteen seconds.
+   *
+   * One request, one set of upstream calls: splitting this into two endpoints
+   * would have meant paying Helius twice for the work the two phases share.
+   *
+   * The first object is the partial, the last is complete. A client that does
+   * not care can read to the end and keep only the final line.
+   */
+  const encoder = new TextEncoder();
+  const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+  const writer = writable.getWriter();
+  const line = (body: unknown): Promise<void> =>
+    writer.write(encoder.encode(`${JSON.stringify(body)}\n`));
+
+  /*
+   * Race the first partial against the analysis finishing or failing.
+   *
+   * Once a response body starts streaming its status code is fixed, so
+   * anything that can fail fast — an unimplemented chain, a bad key — has to
+   * fail before the first byte goes out. Only a failure *after* the partial
+   * has to be reported in-band, and by then the reader already has most of
+   * the report.
+   */
+  let announcePartial: (partial: AnalyzeResponse) => void = () => {};
+  const firstPartial = new Promise<AnalyzeResponse>((resolve) => {
+    announcePartial = resolve;
+  });
+
+  const work = adapter.analyze(address, adapterEnv, announcePartial);
+  // An unhandled rejection here would be fatal; the race below owns the error.
+  work.catch(() => {});
+
+  const started = await Promise.race([
+    firstPartial.then((partial) => ({ kind: 'partial' as const, partial })),
+    work.then(
+      (result) => ({ kind: 'done' as const, result }),
+      (error: unknown) => ({ kind: 'error' as const, error }),
+    ),
+  ]);
+
+  if (started.kind === 'error') return errorResponse(started.error, chain, address);
+
+  ctx.waitUntil(
+    (async () => {
+      try {
+        if (started.kind === 'partial') await line(started.partial);
+        const result = started.kind === 'done' ? started.result : await work;
+        await line(result);
+
+        await env.CACHE?.put(cacheKey, JSON.stringify(result), {
+          expirationTtl: Math.max(60, CACHE.ttlSeconds),
+        });
+      } catch (err) {
+        console.error('analysis failed mid-stream', { chain, address, error: String(err) });
+        // The reader already has the partial; tell it the rest is not coming.
+        await line({ error: 'analysis_failed', message: 'Could not finish this analysis.' });
+      } finally {
+        await writer.close();
+      }
+    })(),
+  );
+
+  return new Response(readable, {
+    status: 200,
+    headers: {
+      'content-type': 'application/x-ndjson; charset=utf-8',
+      'cache-control': `public, max-age=${CACHE.ttlSeconds}`,
+    },
+  });
+}
+
+function errorResponse(err: unknown, chain: string, address: string): Response {
+  if (err instanceof ChainNotSupportedError) {
+    return json<ApiError>(
+      { error: 'chain_not_implemented', message: `${chain} analysis is not available yet.` },
+      501,
+    );
+  }
+  if (err instanceof HeliusError) {
+    console.error('provider error', { chain, address, message: err.message, status: err.status });
+    return json<ApiError>(
+      { error: 'upstream_error', message: 'On-chain data is temporarily unavailable.' },
+      502,
+    );
+  }
+  console.error('analysis failed', { chain, address, error: String(err) });
+  return json<ApiError>({ error: 'analysis_failed', message: 'Could not analyse this token.' }, 500);
 }
 
 app.notFound((c) => c.json<ApiError>({ error: 'not_found', message: 'No such endpoint.' }, 404));
