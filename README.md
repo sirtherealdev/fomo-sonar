@@ -125,9 +125,16 @@ Two implementation notes that are load-bearing for the trust story:
   page, so we poll `location.href` instead
   ([navigation.ts](extension/lib/navigation.ts)). Invisible to the page, and
   it cannot break trading.
-- **Reading the mint is URL-first** ([mint.ts](extension/lib/mint.ts)). Only
-  when the route does not carry the address do we fall back to read-only DOM
-  queries over outbound explorer links.
+- **Reading the address is URL-first** ([mint.ts](extension/lib/mint.ts)).
+  Fomo token pages are `/tokens/<chain>/<address>`. Rather than matching that
+  one route, the detector walks the path segments looking for an address and
+  takes the chain from the segment before it — a route rename cannot silently
+  blind the extension. Only if the path carries no address do we fall back to
+  read-only DOM queries over outbound explorer links.
+
+  Only the `solana` chain slug is confirmed against a real page. The other six
+  are best guesses in `CHAIN_ALIASES` until someone opens a token page on
+  those chains.
 
 ## How the detection works
 
