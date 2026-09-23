@@ -12,9 +12,9 @@
  * all we needed to know, and it is not fresh.
  */
 
-import { DETECTION, LIMITS } from '../config.ts';
-import type { EnhancedTransaction, HeliusClient } from '../helius.ts';
-import { chunk, mapWithConcurrency } from '../util.ts';
+import { DETECTION, LIMITS } from '../../config.ts';
+import type { EnhancedTransaction, HeliusClient } from './helius.ts';
+import { chunk, mapWithConcurrency } from '../../util.ts';
 
 export interface WalletProfile {
   address: string;

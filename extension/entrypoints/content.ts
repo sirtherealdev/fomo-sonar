@@ -11,7 +11,7 @@
  * and mutates no DOM.
  */
 
-import { detectMint } from '../lib/mint';
+import { detectToken, type TokenRef } from '../lib/mint';
 import { watchUrl } from '../lib/navigation';
 
 /**
@@ -30,7 +30,7 @@ export default defineContentScript({
   main() {
     log('active');
 
-    let currentMint: string | null = null;
+    let current: TokenRef | null = null;
     // Bumped on every navigation so a slow retry chain from the previous page
     // cannot report its mint after the user has already moved on.
     let generation = 0;
@@ -38,12 +38,12 @@ export default defineContentScript({
     watchUrl((url) => {
       const thisGeneration = ++generation;
 
-      void resolveMint(url, () => generation === thisGeneration).then((mint) => {
+      void resolveToken(url, () => generation === thisGeneration).then((token) => {
         if (generation !== thisGeneration) return;
-        if (mint === currentMint) return;
+        if (token?.address === current?.address && token?.chain === current?.chain) return;
 
-        currentMint = mint;
-        if (mint) log('token page:', mint, '·', url);
+        current = token;
+        if (token) log(`token page: ${token.chain}:${token.address}`, '·', url);
         else log('not a token page:', url);
       });
     });
@@ -51,13 +51,13 @@ export default defineContentScript({
 });
 
 /** Try the URL, then the DOM, backing off until the page has rendered. */
-async function resolveMint(url: string, isCurrent: () => boolean): Promise<string | null> {
+async function resolveToken(url: string, isCurrent: () => boolean): Promise<TokenRef | null> {
   for (const delay of DOM_RETRY_DELAYS_MS) {
     if (delay > 0) await sleep(delay);
     if (!isCurrent()) return null;
 
-    const mint = detectMint(url);
-    if (mint) return mint;
+    const token = detectToken(url);
+    if (token) return token;
   }
   return null;
 }

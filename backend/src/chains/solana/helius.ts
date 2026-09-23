@@ -8,7 +8,7 @@
  * Every call is counted so an analysis can report what it cost.
  */
 
-import { LIMITS } from './config.ts';
+import { LIMITS } from '../../config.ts';
 
 export class HeliusError extends Error {
   constructor(

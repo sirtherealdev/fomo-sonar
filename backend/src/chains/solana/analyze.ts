@@ -22,15 +22,15 @@
  * be null without affecting anything else.
  */
 
-import { DETECTION, LIMITS } from '../config.ts';
-import { HeliusClient } from '../helius.ts';
-import { fetchMarket } from '../market.ts';
-import { pctOf, round2 } from '../util.ts';
+import { DETECTION, LIMITS } from '../../config.ts';
+import { HeliusClient } from './helius.ts';
+import { fetchMarket } from '../../market.ts';
+import { pctOf, round2 } from '../../util.ts';
 import { findCreation } from './creation.ts';
 import { analyzeEarlyWindow } from './early.ts';
 import { buildHolderMap, getTopHolders, holdingPctOf } from './holders.ts';
 import { isFreshWallet, profileWallets, type WalletProfile } from './wallets.ts';
-import { scoreRisk, type FactorInputs } from './score.ts';
+import { scoreRisk, type FactorInputs } from '../../scoring.ts';
 import type {
   AnalyzeResponse,
   BundleReport,
@@ -55,7 +55,7 @@ export async function analyzeMint(client: HeliusClient, mint: string): Promise<A
     buildHolderMap(client, mint),
     getTopHolders(client, mint, supply),
     client.getAssetMetadata(mint),
-    fetchMarket(mint),
+    fetchMarket('solana', mint),
   ]);
 
   if (creation.truncated) {
@@ -143,11 +143,13 @@ export async function analyzeMint(client: HeliusClient, mint: string): Promise<A
 
   const insiders = findInsiders(creation.dev, ranked, profiles, holderMap, supply);
 
+  // On Solana the question "can anyone change the rules" is answered by the
+  // two authorities on the mint account. Both null is the safe state.
   const security: SecurityInfo = {
-    mintAuthority: mintAccount.mintAuthority,
-    freezeAuthority: mintAccount.freezeAuthority,
-    mintAuthorityRevoked: mintAccount.mintAuthority === null,
-    freezeAuthorityRevoked: mintAccount.freezeAuthority === null,
+    canMintMore: mintAccount.mintAuthority !== null,
+    canFreeze: mintAccount.freezeAuthority !== null,
+    controller: mintAccount.mintAuthority ?? mintAccount.freezeAuthority,
+    detail: describeAuthorities(mintAccount.mintAuthority, mintAccount.freezeAuthority),
   };
 
   // DexScreener carries the socials and the image the token actually ships
@@ -177,6 +179,7 @@ export async function analyzeMint(client: HeliusClient, mint: string): Promise<A
 
   return {
     mint,
+    chain: 'solana',
     token,
     market: marketResult.market,
     security,
@@ -216,9 +219,16 @@ export async function analyzeMint(client: HeliusClient, mint: string): Promise<A
  * live freeze authority is milder but still means your balance can be locked.
  */
 function authorityRisk(security: SecurityInfo): number {
-  if (!security.mintAuthorityRevoked) return 100;
-  if (!security.freezeAuthorityRevoked) return 50;
+  if (security.canMintMore) return 100;
+  if (security.canFreeze) return 50;
   return 0;
+}
+
+function describeAuthorities(mintAuthority: string | null, freezeAuthority: string | null): string {
+  if (mintAuthority && freezeAuthority) return 'Mint and freeze authority are both still live.';
+  if (mintAuthority) return 'Mint authority is still live: supply can be increased.';
+  if (freezeAuthority) return 'Freeze authority is still live: balances can be frozen.';
+  return 'Mint and freeze authority are both revoked.';
 }
 
 function buildDevReport(

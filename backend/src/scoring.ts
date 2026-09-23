@@ -8,8 +8,8 @@
  * not the same as "the dev holds nothing".
  */
 
-import { SCORING } from '../config.ts';
-import { clamp, round2 } from '../util.ts';
+import { SCORING } from './config.ts';
+import { clamp, round2 } from './util.ts';
 import type { RiskFactor, RiskLevel } from '@scope/shared';
 
 type FactorKey = RiskFactor['key'];

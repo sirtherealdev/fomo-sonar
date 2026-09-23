@@ -8,9 +8,10 @@
 
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import { isValidAddress, mintFromUrl } from './mint';
+import { detectToken, isValidAddress, mintFromUrl } from './mint';
 
 const MINT = 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263';
+const EVM = '0x4200000000000000000000000000000000000006';
 
 describe('mintFromUrl', () => {
   const found: [string, string][] = [
@@ -54,5 +55,34 @@ describe('isValidAddress', () => {
 
   it('rejects anything too short to be 32 bytes', () => {
     assert.equal(isValidAddress('abc'), false);
+  });
+});
+
+describe('detectToken', () => {
+  it('reads a base58 address as Solana without needing a chain hint', () => {
+    assert.deepEqual(detectToken(`https://fomo.family/token/${MINT}`), {
+      chain: 'solana',
+      address: MINT,
+    });
+  });
+
+  it('reads the chain from the path for an EVM address', () => {
+    assert.deepEqual(detectToken(`https://fomo.family/token/base/${EVM}`), {
+      chain: 'base',
+      address: EVM,
+    });
+  });
+
+  it('maps bnb to bsc', () => {
+    assert.deepEqual(detectToken(`https://fomo.family/token/bnb/${EVM}`), {
+      chain: 'bsc',
+      address: EVM,
+    });
+  });
+
+  it('refuses an EVM address with no chain in the URL', () => {
+    // Guessing here would mean reading Base's address against Ethereum's state
+    // and reporting a confident, completely wrong result.
+    assert.equal(detectToken(`https://fomo.family/token/${EVM}`), null);
   });
 });
