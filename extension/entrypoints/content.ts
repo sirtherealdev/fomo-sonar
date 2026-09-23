@@ -60,12 +60,16 @@ export default defineContentScript({
         panel.showLoading(shortLabel(token.address));
 
         inFlight = new AbortController();
-        const result = await analyze(token.chain, token.address, inFlight.signal);
-        if (generation !== thisGeneration) return;
+        const shown = panel;
 
-        // An aborted request means the user already moved on.
-        if (result.status === 'error' && result.message === 'cancelled') return;
-        panel.showResult(result);
+        // Two results arrive: a partial within a few seconds, then the
+        // complete one. Each repaints the panel in place.
+        await analyze(token.chain, token.address, inFlight.signal, (result) => {
+          if (generation !== thisGeneration) return;
+          // An aborted request means the user already moved on.
+          if (result.status === 'error' && result.message === 'cancelled') return;
+          shown.showResult(result);
+        });
       })();
     });
   },

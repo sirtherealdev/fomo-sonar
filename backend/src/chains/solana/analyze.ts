@@ -46,9 +46,10 @@ export async function analyzeMint(
   client: HeliusClient,
   mint: string,
   cache?: LaunchCache | undefined,
+  onPartial?: ((partial: AnalyzeResponse) => void) | undefined,
 ): Promise<AnalyzeResponse> {
   const startedAt = Date.now();
-  const warnings: string[] = [];
+  const baseWarnings: string[] = [];
 
   // Supply, decimals and both authorities in one call.
   const mintAccount = await client.getMintAccount(mint);
@@ -69,17 +70,17 @@ export async function analyzeMint(
   ]);
 
   if (creation?.truncated) {
-    warnings.push(
+    baseWarnings.push(
       `This token has more than ${LIMITS.maxSignaturePages * 1000} transactions, so we could not reach its first one. Dev, bundler and sniper detection are unavailable.`,
     );
   }
   if (holderMap.truncated) {
-    warnings.push(
+    baseWarnings.push(
       `More than ${LIMITS.maxHolderPages * 1000} holders; wallet-set percentages are a lower bound.`,
     );
   }
   if (!marketResult.market) {
-    warnings.push('No DEX pool found for this token, so price and liquidity are unavailable.');
+    baseWarnings.push('No DEX pool found for this token, so price and liquidity are unavailable.');
   }
 
   const launch = cachedLaunch ?? (await readLaunch(client, mint, creation));
@@ -89,7 +90,7 @@ export async function analyzeMint(
     void cache?.put('solana', mint, launch).catch(() => {});
   }
   if (launch?.truncated) {
-    warnings.push(
+    baseWarnings.push(
       `More than ${LIMITS.maxEarlyTransactions} transactions in the launch window; bundler and sniper counts are a lower bound.`,
     );
   }
@@ -113,77 +114,6 @@ export async function analyzeMint(
   // know who funded it.
   const interesting = dev ? [dev, ...ranked] : ranked;
 
-  const profiles = await profileWallets(client, interesting);
-  if (candidates.length > LIMITS.maxFreshWalletChecks) {
-    warnings.push(
-      `Only the ${LIMITS.maxFreshWalletChecks} largest of ${candidates.length} notable wallets were checked for age and funding; fresh-wallet and insider counts are a lower bound.`,
-    );
-  }
-
-  const now = Math.floor(Date.now() / 1000);
-
-  // --- Reports --------------------------------------------------------------
-  const devReport = buildDevReport(launch, decimals, holderMap, supply);
-
-  // How much of the supply a wallet set took at launch, whatever it holds now.
-  const boughtPctOf = (wallets: Iterable<string>): number => {
-    let ui = 0;
-    for (const wallet of wallets) ui += launch?.bought[wallet] ?? 0;
-    return pctOf(BigInt(Math.round(ui * 10 ** decimals)), supply);
-  };
-
-  const bundles: BundleReport = launch
-    ? {
-        walletCount: bundlerSet.size,
-        holdingPct: holdingPctOf(bundlerSet, holderMap, supply).pct,
-        boughtPct: boughtPctOf(bundlerSet),
-        clusters: buildClusters(bundlerSet, profiles, holderMap, supply),
-      }
-    : {
-        walletCount: 0,
-        holdingPct: 0,
-        boughtPct: 0,
-        clusters: [],
-        unavailable: 'creation-not-found',
-      };
-
-  const snipers: CountAndHolding = launch
-    ? {
-        count: sniperSet.size,
-        holdingPct: holdingPctOf(sniperSet, holderMap, supply).pct,
-        boughtPct: boughtPctOf(sniperSet),
-      }
-    : { count: 0, holdingPct: 0, boughtPct: null, unavailable: 'creation-not-found' };
-
-  // The dev is reported on its own line, never folded into the fresh-wallet count.
-  const freshAddresses = ranked.filter((address) => isFreshWallet(profiles.get(address), now));
-  const freshWallets: CountAndHolding = {
-    count: freshAddresses.length,
-    holdingPct: holdingPctOf(freshAddresses, holderMap, supply).pct,
-    boughtPct: null,
-  };
-
-  const insiders = findInsiders(dev, ranked, profiles, holderMap, supply);
-
-  // Label top holders that look like infrastructure rather than people.
-  const labelledHolders = topHolders.list.map((holder) => {
-    const profile = profiles.get(holder.address);
-    const txCount = profile?.knowsFullHistory === true ? profile.txCount : null;
-    // Busy AND big. Either one on its own says nothing useful.
-    const highActivity =
-      profile !== undefined &&
-      !profile.knowsFullHistory &&
-      holder.pct >= DETECTION.highActivityMinPct;
-    return { ...holder, txCount, highActivity };
-  });
-
-  const flaggedHolder = labelledHolders.find((h) => h.highActivity);
-  if (flaggedHolder) {
-    warnings.push(
-      `${flaggedHolder.pct.toFixed(1)}% is held by a wallet with over ${LIMITS.walletHistoryPageSize} transactions — likely an exchange or protocol wallet, not a single holder.`,
-    );
-  }
-
   // On Solana the question "can anyone change the rules" is answered by the
   // two authorities on the mint account. Both null is the safe state.
   const security: SecurityInfo = {
@@ -203,57 +133,151 @@ export async function analyzeMint(
     socials: marketResult.token.socials ?? [],
   };
 
-  // --- Score ----------------------------------------------------------------
-  const factorInputs: FactorInputs = {
-    devHolding: devReport.unavailable ? null : devReport.holdingPct,
-    devSold: devReport.unavailable ? null : devReport.soldPct,
-    // Bundlers who already sold did their damage: a launch where same-slot
-    // wallets took half the supply is bundled whether or not they still hold it.
-    bundles: bundles.unavailable ? null : Math.max(bundles.holdingPct, bundles.boughtPct),
-    topHolders: topHolders.list.length > 0 ? topHolders.top10Pct : null,
-    snipers: snipers.unavailable ? null : Math.max(snipers.holdingPct, snipers.boughtPct ?? 0),
-    freshWallets: freshWallets.holdingPct,
-    insiders: insiders.unavailable ? null : insiders.holdingPct,
-    authorities: authorityRisk(security),
-  };
-  const { score, level, factors, floor, coverage } = scoreRisk(factorInputs);
+  /**
+   * Assemble a response from whatever we know.
+   *
+   * Called twice: once with no wallet profiles (the partial, which carries
+   * every signal that does not need a per-wallet lookup — 82 of the 100
+   * scoring weight, for about a third of the time), and once with them.
+   * One assembly path, so the two phases cannot drift apart.
+   */
+  const build = (profiles: Map<string, WalletProfile> | null): AnalyzeResponse => {
+    const phase = profiles ? 'final' : 'partial';
+    const warnings = [...baseWarnings];
+    const now = Math.floor(Date.now() / 1000);
 
-  const partial = warnings.length > 0 || factors.length < Object.keys(factorInputs).length;
+    if (profiles && candidates.length > LIMITS.maxFreshWalletChecks) {
+      warnings.push(
+        `Only the ${LIMITS.maxFreshWalletChecks} largest of ${candidates.length} notable wallets were checked for age and funding; fresh-wallet and insider counts are a lower bound.`,
+      );
+    }
 
-  return {
-    mint,
-    chain: 'solana',
-    coverage,
-    token,
-    market: marketResult.market,
-    security,
-    holderCount: holderMap.holderCount,
-    riskScore: score,
-    riskLevel: level,
-    dev: devReport,
-    bundles,
-    topHolders: {
-      top10Pct: topHolders.top10Pct,
-      list: labelledHolders,
-      excluded: topHolders.excluded,
-    },
-    snipers,
-    freshWallets,
-    insiders,
-    analyzedAt: new Date().toISOString(),
-    warnings,
-    factors,
-    scoreFloor: floor,
-    meta: {
-      supply: supply.toString(),
-      decimals,
-      createdAt: launch ? new Date(launch.timestamp * 1000).toISOString() : null,
-      creationSignature: launch?.signature ?? null,
-      rpcCalls: client.calls,
-      durationMs: Date.now() - startedAt,
-      partial,
-    },
+    const devReport = buildDevReport(launch, decimals, holderMap, supply);
+
+    // How much of the supply a wallet set took at launch, whatever it holds now.
+    const boughtPctOf = (wallets: Iterable<string>): number => {
+      let ui = 0;
+      for (const wallet of wallets) ui += launch?.bought[wallet] ?? 0;
+      return pctOf(BigInt(Math.round(ui * 10 ** decimals)), supply);
+    };
+
+    const bundles: BundleReport = launch
+      ? {
+          walletCount: bundlerSet.size,
+          holdingPct: holdingPctOf(bundlerSet, holderMap, supply).pct,
+          boughtPct: boughtPctOf(bundlerSet),
+          // Clusters need funding data, which only the profiling pass has.
+          clusters: profiles ? buildClusters(bundlerSet, profiles, holderMap, supply) : [],
+        }
+      : {
+          walletCount: 0,
+          holdingPct: 0,
+          boughtPct: 0,
+          clusters: [],
+          unavailable: 'creation-not-found',
+        };
+
+    const snipers: CountAndHolding = launch
+      ? {
+          count: sniperSet.size,
+          holdingPct: holdingPctOf(sniperSet, holderMap, supply).pct,
+          boughtPct: boughtPctOf(sniperSet),
+        }
+      : { count: 0, holdingPct: 0, boughtPct: null, unavailable: 'creation-not-found' };
+
+    // The dev is reported on its own line, never folded into the fresh count.
+    const freshAddresses = profiles
+      ? ranked.filter((address) => isFreshWallet(profiles.get(address), now))
+      : [];
+
+    const freshWallets: CountAndHolding = profiles
+      ? {
+          count: freshAddresses.length,
+          holdingPct: holdingPctOf(freshAddresses, holderMap, supply).pct,
+          boughtPct: null,
+        }
+      : { count: 0, holdingPct: 0, boughtPct: null, unavailable: 'pending' };
+
+    const insiders: CountAndHolding = profiles
+      ? findInsiders(dev, ranked, profiles, holderMap, supply)
+      : { count: 0, holdingPct: 0, boughtPct: null, unavailable: 'pending' };
+
+    // Label top holders that look like infrastructure rather than people.
+    const labelledHolders = topHolders.list.map((holder) => {
+      const profile = profiles?.get(holder.address);
+      const txCount = profile?.knowsFullHistory === true ? profile.txCount : null;
+      // Busy AND big. Either one on its own says nothing useful.
+      const highActivity =
+        profile !== undefined &&
+        !profile.knowsFullHistory &&
+        holder.pct >= DETECTION.highActivityMinPct;
+      return { ...holder, txCount, highActivity };
+    });
+
+    const flaggedHolder = labelledHolders.find((h) => h.highActivity);
+    if (flaggedHolder) {
+      warnings.push(
+        `${flaggedHolder.pct.toFixed(1)}% is held by a wallet with over ${LIMITS.walletHistoryPageSize} transactions — likely an exchange or protocol wallet, not a single holder.`,
+      );
+    }
+
+    // --- Score --------------------------------------------------------------
+    const factorInputs: FactorInputs = {
+      devHolding: devReport.unavailable ? null : devReport.holdingPct,
+      devSold: devReport.unavailable ? null : devReport.soldPct,
+      // Bundlers who already sold did their damage: a launch where same-slot
+      // wallets took half the supply is bundled whether or not they still hold it.
+      bundles: bundles.unavailable ? null : Math.max(bundles.holdingPct, bundles.boughtPct),
+      topHolders: topHolders.list.length > 0 ? topHolders.top10Pct : null,
+      snipers: snipers.unavailable ? null : Math.max(snipers.holdingPct, snipers.boughtPct ?? 0),
+      freshWallets: freshWallets.unavailable ? null : freshWallets.holdingPct,
+      insiders: insiders.unavailable ? null : insiders.holdingPct,
+      authorities: authorityRisk(security),
+    };
+    const { score, level, factors, floor, coverage } = scoreRisk(factorInputs);
+
+    return {
+      mint,
+      chain: 'solana',
+      phase,
+      coverage,
+      token,
+      market: marketResult.market,
+      security,
+      holderCount: holderMap.holderCount,
+      riskScore: score,
+      riskLevel: level,
+      dev: devReport,
+      bundles,
+      topHolders: {
+        top10Pct: topHolders.top10Pct,
+        list: labelledHolders,
+        excluded: topHolders.excluded,
+      },
+      snipers,
+      freshWallets,
+      insiders,
+      analyzedAt: new Date().toISOString(),
+      warnings,
+      factors,
+      scoreFloor: floor,
+      meta: {
+        supply: supply.toString(),
+        decimals,
+        createdAt: launch ? new Date(launch.timestamp * 1000).toISOString() : null,
+        creationSignature: launch?.signature ?? null,
+        rpcCalls: client.calls,
+        durationMs: Date.now() - startedAt,
+        partial: warnings.length > 0 || factors.length < Object.keys(factorInputs).length,
+      },
+    };
   };
+
+  // Everything above this line is done; hand it over before paying for the
+  // per-wallet pass, which costs more than all of it put together.
+  onPartial?.(build(null));
+
+  return build(await profileWallets(client, interesting));
 }
 
 /**

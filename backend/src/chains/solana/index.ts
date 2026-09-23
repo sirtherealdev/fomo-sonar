@@ -16,9 +16,18 @@ export const solanaAdapter: ChainAdapter = {
     return BASE58_ADDRESS.test(address);
   },
 
-  analyze(address: string, env: AdapterEnv): Promise<AnalyzeResponse> {
+  analyze(
+    address: string,
+    env: AdapterEnv,
+    onPartial?: ((partial: AnalyzeResponse) => void) | undefined,
+  ): Promise<AnalyzeResponse> {
     // Constructing the client here (not at module scope) keeps meta.rpcCalls
     // per-request rather than cumulative across the Worker's lifetime.
-    return analyzeMint(new HeliusClient(env.HELIUS_API_KEY ?? ''), address, env.launchCache);
+    return analyzeMint(
+      new HeliusClient(env.HELIUS_API_KEY ?? ''),
+      address,
+      env.launchCache,
+      onPartial,
+    );
   },
 };

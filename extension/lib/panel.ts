@@ -218,7 +218,10 @@ function score(data: AnalyzeResponse): HTMLElement {
     : top
       ? `driven by ${factorLabel(top.key)}`
       : 'risk score';
-  meta.append(bar, el('div', 'caption', reason));
+  // Say so while the wallet-level signals are still landing, so a score that
+  // moves a moment later does not look like the panel changing its mind.
+  const caption = data.phase === 'partial' ? `${reason} · still checking wallets` : reason;
+  meta.append(bar, el('div', 'caption', caption));
 
   wrap.append(number, meta);
   return wrap;
@@ -251,7 +254,12 @@ function countRow(
   sub: string,
 ): HTMLElement {
   const unavailable = 'unavailable' in value ? value.unavailable : undefined;
-  return row(name, unavailable ? null : pct(value.holdingPct), unavailable ? unavailableText(unavailable) : sub);
+  return row(
+    name,
+    unavailable ? null : pct(value.holdingPct),
+    unavailable ? unavailableText(unavailable) : sub,
+    unavailable === 'pending',
+  );
 }
 
 /**
@@ -283,9 +291,11 @@ function topHolderNote(data: AnalyzeResponse): string {
   return 'excl. pools';
 }
 
-function row(name: string, figure: string | null, sub: string): HTMLElement {
+function row(name: string, figure: string | null, sub: string, pending = false): HTMLElement {
   const wrap = el('div', figure === null ? 'row unknown' : 'row');
-  wrap.append(el('span', 'name', name), el('span', 'figure', figure ?? 'unknown'), el('span', 'sub', sub));
+  // A row still being measured says so, rather than claiming it is unknowable.
+  const placeholder = pending ? '…' : 'unknown';
+  wrap.append(el('span', 'name', name), el('span', 'figure', figure ?? placeholder), el('span', 'sub', sub));
   return wrap;
 }
 
@@ -458,6 +468,7 @@ function unavailableText(reason: string): string {
     'holder-set-partial': 'partial holder data',
     'no-market-data': 'no market data',
     'not-supported-on-chain': 'not supported here',
+    pending: 'checking…',
   };
   return reasons[reason] ?? 'unavailable';
 }

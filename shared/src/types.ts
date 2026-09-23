@@ -35,7 +35,8 @@ export type Unavailable =
   | 'no-dev-allocation' // dev never held any of the supply, so "sold %" is meaningless
   | 'holder-set-partial' // holder pagination hit its cap, percentages would understate
   | 'no-market-data' // the token is not indexed on any DEX we can read
-  | 'not-supported-on-chain'; // this chain's adapter cannot measure this signal
+  | 'not-supported-on-chain' // this chain's adapter cannot measure this signal
+  | 'pending'; // still being measured; a later phase of this response will fill it in
 
 export interface HolderEntry {
   /** Wallet that owns the token account, not the token account itself. */
@@ -209,6 +210,14 @@ export interface AnalyzeResponse {
   /** Contract address: a base58 mint on Solana, a 0x address on EVM chains. */
   mint: string;
   chain: ChainId;
+  /**
+   * `partial` arrives first and carries everything that does not need
+   * per-wallet lookups — which is most of the weight and about a third of the
+   * time. `final` follows with fresh wallets, insiders and funding clusters.
+   *
+   * A non-streaming client can simply ignore every object but the last.
+   */
+  phase: 'partial' | 'final';
   /**
    * Share of the scoring weight we could actually measure, 0..100.
    * Below SCORING.minCoverageForLevel the level is reported as 'unknown'.
