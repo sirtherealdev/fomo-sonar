@@ -135,6 +135,17 @@ export const SCORING = {
     authorities: { atLeast: 100, floor: 75 },
   },
 
+  /**
+   * How much of the scoring weight must be measurable before we are willing to
+   * put a label on a token.
+   *
+   * Found the hard way: a token one day old had already outrun our signature
+   * cap, so dev, bundler and sniper detection all dropped out — and the
+   * remaining factors produced a confident "3/100 low" on a token nobody had
+   * actually checked for bundling. Below this coverage we report 'unknown'.
+   */
+  minCoverageForLevel: 70,
+
   /** Score thresholds for the three-band label. */
   levels: { mediumAt: 35, highAt: 65 },
 } as const;

@@ -23,6 +23,8 @@ export interface ScoreResult {
   factors: RiskFactor[];
   /** Non-null when one signal alone forced the score up to a minimum. */
   floor: ScoreFloor | null;
+  /** Share of the total scoring weight we could measure, 0..100. */
+  coverage: number;
 }
 
 export function scoreRisk(inputs: FactorInputs): ScoreResult {
@@ -31,10 +33,12 @@ export function scoreRisk(inputs: FactorInputs): ScoreResult {
   );
 
   if (measured.length === 0) {
-    return { score: 0, level: 'low', factors: [], floor: null };
+    return { score: 0, level: 'unknown', factors: [], floor: null, coverage: 0 };
   }
 
   const totalWeight = measured.reduce((sum, [key]) => sum + SCORING.weights[key], 0);
+  const allWeight = Object.values(SCORING.weights).reduce((sum, w) => sum + w, 0);
+  const coverage = round2((totalWeight / allWeight) * 100);
 
   const factors: RiskFactor[] = measured.map(([key, value]) => {
     const normalized = ramp(value, SCORING.ramps[key]);
@@ -47,8 +51,17 @@ export function scoreRisk(inputs: FactorInputs): ScoreResult {
   const floor = strongestFloor(measured);
   const score = Math.max(weighted, floor?.floor ?? 0);
 
+  /*
+   * A floor still applies when coverage is poor: if the little we could measure
+   * was alarming, that is a real finding. But a *reassuring* score built on
+   * half the evidence is not — so below the coverage threshold we withhold the
+   * label rather than hand out a green light we did not earn.
+   */
+  const level =
+    coverage >= SCORING.minCoverageForLevel || floor !== null ? levelFor(score) : 'unknown';
+
   // The floor only matters if it actually lifted the score.
-  return { score, level: levelFor(score), factors, floor: score > weighted ? floor : null };
+  return { score, level, factors, floor: score > weighted ? floor : null, coverage };
 }
 
 /**

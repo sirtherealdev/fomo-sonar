@@ -21,7 +21,12 @@ export type ChainId =
 /** Chain families that share a set of primitives, and therefore an adapter. */
 export type ChainFamily = 'svm' | 'evm';
 
-export type RiskLevel = 'low' | 'medium' | 'high';
+/**
+ * `unknown` is not a fourth severity — it means we could not measure enough to
+ * have an opinion. A green "low" on a token whose launch we could not read is
+ * worse than showing nothing, because it reads as a clearance.
+ */
+export type RiskLevel = 'low' | 'medium' | 'high' | 'unknown';
 
 /** Why a detector could not produce a number. Surfaced so the UI never shows a fake 0. */
 export type Unavailable =
@@ -204,6 +209,11 @@ export interface AnalyzeResponse {
   /** Contract address: a base58 mint on Solana, a 0x address on EVM chains. */
   mint: string;
   chain: ChainId;
+  /**
+   * Share of the scoring weight we could actually measure, 0..100.
+   * Below SCORING.minCoverageForLevel the level is reported as 'unknown'.
+   */
+  coverage: number;
   token: TokenInfo;
   market: MarketInfo | null;
   security: SecurityInfo;

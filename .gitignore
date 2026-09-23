@@ -11,3 +11,4 @@ dist/
 .output/
 .wxt/
 .preview/
+.launch-cache.json

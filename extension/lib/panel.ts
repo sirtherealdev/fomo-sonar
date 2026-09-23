@@ -146,6 +146,18 @@ function headline(data: AnalyzeResponse): HTMLElement {
 
 function score(data: AnalyzeResponse): HTMLElement {
   const wrap = el('div', 'score');
+
+  // Withhold the number too, not just the label: a reader takes "12" as a
+  // verdict no matter what the caption underneath says.
+  if (data.riskLevel === 'unknown') {
+    const meta = el('div', 'meta');
+    meta.append(
+      el('div', 'caption', `Only ${Math.round(data.coverage)}% of the risk signals could be measured for this token.`),
+    );
+    wrap.append(el('div', 'number unknown', '?'), meta);
+    return wrap;
+  }
+
   const number = el('div', `number ${data.riskLevel}`, String(data.riskScore));
 
   const bar = el('div', 'bar');

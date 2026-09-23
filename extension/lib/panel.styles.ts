@@ -58,6 +58,7 @@ export const PANEL_STYLES = `
 .pill.medium { background: rgba(217, 160, 40, .16); color: #fbbf24; }
 .pill.high   { background: rgba(220, 68, 68, .16);  color: #f87171; }
 .pill.muted  { background: #1c2028; color: #8b93a5; }
+.pill.unknown { background: #1c2028; color: #8b93a5; }
 
 .toggle {
   all: unset;
@@ -90,6 +91,7 @@ export const PANEL_STYLES = `
 .score .number.low    { color: #4ade80; }
 .score .number.medium { color: #fbbf24; }
 .score .number.high   { color: #f87171; }
+.score .number.unknown { color: #5f6676; }
 .score .meta { flex: 1; display: grid; gap: 4px; }
 .bar { height: 4px; border-radius: 999px; background: #1e222a; overflow: hidden; }
 .bar > span { display: block; height: 100%; border-radius: 999px; }
