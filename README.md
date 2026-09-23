@@ -3,8 +3,9 @@
 Read-only token risk overlay for [Fomo Web](https://fomo.family). Solana only for now.
 
 The extension detects when you are on a token page, reads the mint address, and
-shows on-chain risk data next to it: dev wallet, bundlers, holder concentration,
-snipers, fresh wallets, and a combined risk score.
+shows the numbers you would otherwise open a second terminal for: price, market
+cap, liquidity, holders, authority checks — plus the risk breakdown underneath
+it (dev wallet, bundlers, insiders, snipers, fresh wallets, concentration).
 
 ## Trust rules
 
@@ -82,7 +83,27 @@ Each detector is one file in `backend/src/analysis/`, commented in place.
 | **Top holders** | Top 10 by balance, excluding burn addresses, known programs, and any account owned by a program rather than the System Program (which covers AMM vaults and bonding curves generically). |
 | **Snipers** | Buyers inside the first `sniperWindowSeconds`, excluding bundlers so the score cannot count a wallet twice. |
 | **Fresh wallets** | Holders with `<= freshWalletMaxTxCount` lifetime transactions, or first seen less than `freshWalletMaxAgeHours` ago. |
-| **Risk score** | Weighted sum of the six percentages above, each through a safe→danger ramp. A signal we could not measure is dropped and its weight redistributed — never scored as zero. |
+| **Insiders** | Notable wallets whose first SOL came from the dev, plus the dev's own funder when it also holds. One hop only — deeper graph walks mostly find exchange hot wallets. |
+| **Authorities** | Mint authority live means the supply is not final and can be diluted at will; freeze authority live means balances can be locked. Both read straight off the mint account. |
+| **Risk score** | Weighted sum of the percentages above, each through a safe→danger ramp. A signal we could not measure is dropped and its weight redistributed — never scored as zero. |
+
+### Headline data
+
+Alongside the risk breakdown, `/analyze/:mint` returns what a trading terminal
+would show up top:
+
+| Field | Source |
+| --- | --- |
+| Name, symbol, image, socials, website | DexScreener pair info, falling back to Helius DAS |
+| Price, market cap, FDV, liquidity, 24h volume | DexScreener, deepest Solana pool |
+| Price change 5m / 1h / 6h / 24h, 24h buys vs sells | DexScreener |
+| DEX, pair address, pair age, "dex paid" | DexScreener |
+| Holder count | Our own holder map |
+| Mint / freeze authority | The mint account itself |
+
+DexScreener needs no API key and is called only from the backend. It is
+strictly best-effort: if it is slow or down, `market` comes back `null` and the
+risk report is unaffected.
 
 ### Known limits
 
@@ -94,6 +115,9 @@ Each detector is one file in `backend/src/analysis/`, commented in place.
   window, so a dev who accumulated later is not counted.
 - Every truncation and every unavailable detector appears in `warnings[]`, and
   `meta.partial` is true whenever the report is incomplete.
+- **LP burned is not implemented yet.** Reading it means decoding each AMM's
+  pool layout to find the LP mint, and a wrong number here is worse than a
+  missing one. It is the next headline field worth adding.
 - A full analysis costs roughly 20–100 Helius calls (`meta.rpcCalls` reports the
   exact number). That exceeds the 50-subrequest limit on Cloudflare's free plan
   for busy tokens — the paid Workers plan allows 1000.

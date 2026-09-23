@@ -38,6 +38,12 @@ export const DETECTION = {
 
   /** How many top holders we report (and score on). */
   topHolderCount: 10,
+
+  /**
+   * Insiders: wallets the dev funded, or that funded the dev. Same-source money
+   * plus a position in the token is the classic "team wallet" shape.
+   */
+  insiderMaxHops: 1,
 } as const;
 
 export const SCORING = {
@@ -46,12 +52,14 @@ export const SCORING = {
    * over whichever factors were actually measurable for this token.
    */
   weights: {
-    devHolding: 20,
-    devSold: 10,
-    bundles: 25,
-    topHolders: 20,
-    snipers: 15,
-    freshWallets: 10,
+    devHolding: 16,
+    devSold: 8,
+    bundles: 20,
+    topHolders: 15,
+    snipers: 11,
+    freshWallets: 8,
+    insiders: 10,
+    authorities: 12,
   },
 
   /**
@@ -71,6 +79,14 @@ export const SCORING = {
     snipers: { safe: 5, danger: 25 },
     /** Combined holding of fresh wallets, % of supply. */
     freshWallets: { safe: 10, danger: 40 },
+    /** Combined holding of dev-linked wallets, % of supply. */
+    insiders: { safe: 3, danger: 20 },
+    /**
+     * Authority risk, already expressed 0..100 by the detector:
+     * 0 = both revoked, 50 = freeze authority live, 100 = mint authority live.
+     * A live mint authority means the supply you are looking at is not final.
+     */
+    authorities: { safe: 0, danger: 100 },
   },
 
   /** Score thresholds for the three-band label. */
