@@ -12,3 +12,5 @@ dist/
 .wxt/
 .preview/
 .launch-cache.json
+
+.env

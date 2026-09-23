@@ -26,6 +26,12 @@ export async function analyze(
   signal: AbortSignal,
   onUpdate: (result: AnalyzeResult) => void,
 ): Promise<void> {
+  if (!API_BASE) {
+    // A production build with no WXT_API_BASE set. Better to say so than to
+    // fire requests at a relative URL on the host page.
+    return onUpdate({ status: 'error', message: 'No risk service configured for this build.' });
+  }
+
   try {
     const res = await fetch(`${API_BASE}/analyze/${chain}/${address}`, {
       method: 'GET',
