@@ -72,16 +72,50 @@ export const PANEL_STYLES = `
 .toggle:hover { color: #e7e9ee; background: #1c2028; }
 .toggle:focus-visible { outline: 2px solid #3b82f6; }
 
-.body { padding: 10px; display: grid; gap: 10px; }
+/*
+ * The panel grew tall enough to run off a short viewport, so the body scrolls
+ * inside itself rather than pushing past the edge of the screen. The header
+ * stays put, so it can always be grabbed and dragged.
+ */
+.body {
+  padding: 10px;
+  display: grid;
+  gap: 10px;
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
 .panel.collapsed .body { display: none; }
 
-/* Headline strip: price, market cap, liquidity, 24h volume. */
-.headline { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
-.stat { display: flex; flex-direction: column; gap: 1px; }
-.stat .label { font-size: 9.5px; text-transform: uppercase; letter-spacing: .07em; color: #767e91; }
-.stat .value { font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.up   { color: #4ade80; }
-.down { color: #f87171; }
+.body::-webkit-scrollbar { width: 6px; }
+.body::-webkit-scrollbar-thumb { background: #2a2f3a; border-radius: 3px; }
+.body::-webkit-scrollbar-track { background: transparent; }
+
+/* Detail blocks: the wallets behind the numbers. */
+.block { display: grid; gap: 3px; }
+.block-title {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: #767e91;
+  margin-bottom: 1px;
+}
+.holder { display: flex; align-items: baseline; gap: 7px; }
+.holder .mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: #a7aebe;
+}
+.holder .figure { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
+.holder .sub { color: #767e91; font-size: 10.5px; }
+.tag {
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(217, 160, 40, .14);
+  color: #d9a028;
+}
+.note { font-size: 9.5px; color: #5f6676; }
 
 .divider { height: 1px; background: #1e222a; }
 

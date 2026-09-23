@@ -18,7 +18,7 @@
 
 import { PANEL } from './config';
 import { PANEL_STYLES } from './panel.styles';
-import { count, pct, shortAddress, signedPct, usd } from './format';
+import { count, pct, shortAddress } from './format';
 import { loadPanelState, savePanelState, type PanelState } from './storage';
 import type { AnalyzeResult } from './api';
 import type { AnalyzeResponse, CountAndHolding } from '@scope/shared';
@@ -115,11 +115,22 @@ export async function createPanel(): Promise<Panel> {
 
 // --- Rendering ---------------------------------------------------------------
 
+/**
+ * Deliberately no price, market cap, liquidity or volume.
+ *
+ * Fomo prints all four in its own header, a couple of centimetres above this
+ * panel. Repeating them would spend half the width on numbers the reader can
+ * already see, and the only reason to install this is the half Fomo does not
+ * show. The backend still returns the market block; the panel just ignores it.
+ */
 function report(data: AnalyzeResponse): Node[] {
-  const nodes: Node[] = [];
+  const nodes: Node[] = [score(data), el('div', 'divider'), signals(data)];
 
-  if (data.market) nodes.push(headline(data), el('div', 'divider'));
-  nodes.push(score(data), el('div', 'divider'), signals(data));
+  const holders = topHolderList(data);
+  if (holders) nodes.push(el('div', 'divider'), holders);
+
+  const clusters = fundingClusters(data);
+  if (clusters) nodes.push(el('div', 'divider'), clusters);
 
   const flags = securityFlags(data);
   if (flags) nodes.push(flags);
@@ -130,17 +141,50 @@ function report(data: AnalyzeResponse): Node[] {
   return nodes;
 }
 
-function headline(data: AnalyzeResponse): HTMLElement {
-  const market = data.market;
-  const wrap = el('div', 'headline');
-  const change = market?.priceChange.h24 ?? null;
+/** The actual wallets behind the concentration number. */
+function topHolderList(data: AnalyzeResponse): HTMLElement | null {
+  if (data.topHolders.list.length === 0) return null;
 
-  wrap.append(
-    stat('Price', usd(market?.priceUsd)),
-    stat('24h', signedPct(change), change === null ? '' : change >= 0 ? 'up' : 'down'),
-    stat('Market cap', usd(market?.marketCapUsd ?? market?.fdvUsd)),
-    stat('Liquidity', usd(market?.liquidityUsd)),
-  );
+  const wrap = el('div', 'block');
+  wrap.append(el('div', 'block-title', 'Top holders'));
+
+  for (const holder of data.topHolders.list.slice(0, 5)) {
+    const line = el('div', 'holder');
+    line.append(el('span', 'mono', shortAddress(holder.address)), el('span', 'figure', pct(holder.pct)));
+    if (holder.highActivity) line.append(el('span', 'tag', 'exchange?'));
+    wrap.append(line);
+  }
+
+  if (data.topHolders.excluded.length > 0) {
+    wrap.append(
+      el('div', 'note', `${data.topHolders.excluded.length} pool or program account(s) excluded`),
+    );
+  }
+
+  return wrap;
+}
+
+/**
+ * Who paid for the bundlers. One address funding a dozen wallets that all
+ * bought in the same slot is the clearest bundling evidence there is, and it
+ * is the one thing here that no other panel on the page can tell you.
+ */
+function fundingClusters(data: AnalyzeResponse): HTMLElement | null {
+  if (data.bundles.clusters.length === 0) return null;
+
+  const wrap = el('div', 'block');
+  wrap.append(el('div', 'block-title', 'Funding clusters'));
+
+  for (const cluster of data.bundles.clusters.slice(0, 3)) {
+    const line = el('div', 'holder');
+    line.append(
+      el('span', 'mono', shortAddress(cluster.funder)),
+      el('span', 'sub', `${count(cluster.wallets.length)} wallets`),
+      el('span', 'figure', pct(cluster.holdingPct)),
+    );
+    wrap.append(line);
+  }
+
   return wrap;
 }
 
@@ -269,11 +313,25 @@ function warnings(messages: string[]): HTMLElement {
 
 function footer(data: AnalyzeResponse): HTMLElement {
   const wrap = el('div', 'footer');
+  const age = tokenAge(data.meta.createdAt);
   wrap.append(
-    el('span', '', `${count(data.holderCount)} holders`),
+    el('span', '', age ? `${count(data.holderCount)} holders · ${age} old` : `${count(data.holderCount)} holders`),
     el('span', '', data.meta.cached ? 'cached' : `${data.meta.durationMs} ms`),
   );
   return wrap;
+}
+
+/** Compact age: 4m, 7h, 6d. Null when we never found the launch. */
+function tokenAge(createdAt: string | null): string | null {
+  if (!createdAt) return null;
+  const ms = Date.now() - new Date(createdAt).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return null;
+
+  const minutes = Math.floor(ms / 60000);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
 }
 
 function skeleton(): Node[] {
