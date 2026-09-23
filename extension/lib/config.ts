@@ -8,5 +8,5 @@ export const API_BASE = import.meta.env.DEV
 export const PANEL = {
   width: 300,
   margin: 16,
-  storageKey: 'panel-state',
+  storageKey: 'panel-state-v2',
 } as const;

@@ -12,16 +12,24 @@
 import { browser } from 'wxt/browser';
 import { PANEL } from './config';
 
+/**
+ * Anchored to the bottom-right, not the top-right.
+ *
+ * Top-right is where Fomo puts its Buy/Sell widget, and an overlay that lands
+ * on the buy button out of the box is not something you install on a trading
+ * page. Bottom anchoring also keeps the panel put when its own height changes
+ * between the loading and loaded states.
+ */
 export interface PanelState {
-  /** Distance from the viewport's right and top edges, in pixels. */
+  /** Distance from the viewport's right and bottom edges, in pixels. */
   right: number;
-  top: number;
+  bottom: number;
   collapsed: boolean;
 }
 
 const DEFAULT_STATE: PanelState = {
   right: PANEL.margin,
-  top: PANEL.margin,
+  bottom: PANEL.margin,
   collapsed: false,
 };
 
@@ -33,7 +41,7 @@ export async function loadPanelState(): Promise<PanelState> {
 
     return {
       right: numberOr(value.right, DEFAULT_STATE.right),
-      top: numberOr(value.top, DEFAULT_STATE.top),
+      bottom: numberOr(value.bottom, DEFAULT_STATE.bottom),
       collapsed: value.collapsed === true,
     };
   } catch {
