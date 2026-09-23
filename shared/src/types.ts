@@ -39,6 +39,16 @@ export interface HolderEntry {
   amount: string;
   /** Share of total supply, 0..100. */
   pct: number;
+  /** Lifetime transaction count, or null when the wallet is busier than we count. */
+  txCount: number | null;
+  /**
+   * The wallet has far more history than any launch participant plausibly
+   * would — an exchange or protocol wallet rather than a person.
+   *
+   * It is labelled, never excluded: dropping it would silently reshape the
+   * concentration number, and we cannot prove what it is from chain data alone.
+   */
+  highActivity: boolean;
 }
 
 export interface ExcludedAccount {
@@ -67,7 +77,10 @@ export interface DevReport {
 export interface BundleReport {
   /** Wallets that bought in the same slot (or within the configured slot window) as creation. */
   walletCount: number;
+  /** Share of supply they hold right now, 0..100. */
   holdingPct: number;
+  /** Share of supply they took at launch, 0..100. Zero holding does not undo this. */
+  boughtPct: number;
   clusters: FundingCluster[];
   unavailable?: Unavailable;
 }
@@ -82,7 +95,16 @@ export interface TopHolderReport {
 
 export interface CountAndHolding {
   count: number;
+  /** Share of supply these wallets hold right now, 0..100. */
   holdingPct: number;
+  /**
+   * Share of supply they received at launch, 0..100, or null where the idea
+   * does not apply (fresh wallets, insiders).
+   *
+   * Current holding alone lies about the most common rug shape: wallets that
+   * took half the supply in the first slot and have already sold it show 0%.
+   */
+  boughtPct: number | null;
   unavailable?: Unavailable;
 }
 

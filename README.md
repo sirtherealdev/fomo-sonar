@@ -136,13 +136,13 @@ Each detector is one file in `backend/src/analysis/`, commented in place.
 | Signal | Definition |
 | --- | --- |
 | **Dev wallet** | Fee payer of the mint's first transaction. Current holding, and how much of its initial allocation has left the wallet. |
-| **Bundlers** | Wallets that received the token in the creation slot or within `bundleSlotWindow` slots — machine timing, not human. Plus funding clusters: bundlers whose first SOL came from the same address. |
-| **Top holders** | Top 10 by balance, excluding burn addresses, known programs, and any account owned by a program rather than the System Program (which covers AMM vaults and bonding curves generically). |
+| **Bundlers** | Wallets that received the token in the creation slot or within `bundleSlotWindow` slots — machine timing, not human. Reported as both what they took at launch and what they still hold, and scored on the worse of the two: a bundler that already dumped is evidence of a bundled launch, not of a clean one. Plus funding clusters: bundlers whose first SOL came from the same address. |
+| **Top holders** | Top 10 by balance, excluding burn addresses, known programs, and any account owned by a program rather than the System Program (which covers AMM vaults and bonding curves generically). Large positions held by very busy wallets are *labelled* as likely exchange or protocol accounts, never silently removed — see below. |
 | **Snipers** | Buyers inside the first `sniperWindowSeconds`, excluding bundlers so the score cannot count a wallet twice. |
 | **Fresh wallets** | Holders with `<= freshWalletMaxTxCount` lifetime transactions, or first seen less than `freshWalletMaxAgeHours` ago. |
 | **Insiders** | Notable wallets whose first SOL came from the dev, plus the dev's own funder when it also holds. One hop only — deeper graph walks mostly find exchange hot wallets. |
 | **Authorities** | Can anyone still mint more supply or freeze balances? On Solana that is the mint and freeze authorities; on EVM it is an un-renounced owner. The panel sees one chain-neutral answer. |
-| **Risk score** | Weighted sum of the percentages above, each through a safe→danger ramp. A signal we could not measure is dropped and its weight redistributed — never scored as zero. |
+| **Risk score** | Weighted sum of the percentages above, each through a safe→danger ramp, plus per-signal **critical floors**: if one signal is severe enough on its own, the score cannot fall below its floor. Without that, a weighted sum over eight factors averages one catastrophic signal into a reassuring "medium". A signal we could not measure is dropped and its weight redistributed — never scored as zero. |
 
 ### Headline data
 
@@ -161,6 +161,23 @@ would show up top:
 DexScreener needs no API key and is called only from the backend. It is
 strictly best-effort: if it is slow or down, `market` comes back `null` and the
 risk report is unaffected.
+
+### Exchange and protocol wallets
+
+The structural pool test (an account owned by a program rather than the System
+Program is a PDA, not a person) catches AMM vaults and bonding curves
+generically. It does not catch infrastructure that runs on ordinary keypairs —
+exchange hot wallets, market makers, launchpad treasuries — which look exactly
+like one whale holding most of the supply.
+
+We label these rather than exclude them: a holder that is both very busy and
+holding a large share is marked `highActivity`, and the report carries a
+warning saying so. Excluding them would silently reshape the concentration
+number on a guess we cannot prove from chain data.
+
+Both halves of the test matter. Activity alone labelled five ordinary 2–3%
+holders on a real token, because an active memecoin trader has thousands of
+transactions — a label that fires that often teaches people to ignore it.
 
 ### Known limits
 

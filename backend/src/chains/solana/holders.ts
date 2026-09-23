@@ -110,7 +110,8 @@ export async function getTopHolders(
       continue;
     }
 
-    list.push({ address: wallet, amount: amount.toString(), pct });
+    // txCount and highActivity are filled in later, once wallets are profiled.
+    list.push({ address: wallet, amount: amount.toString(), pct, txCount: null, highActivity: false });
   }
 
   const top = list.slice(0, DETECTION.topHolderCount);

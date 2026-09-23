@@ -31,6 +31,8 @@ export interface EarlyReceipt {
 
 export interface EarlyWindow {
   receipts: EarlyReceipt[];
+  /** wallet -> decimal-adjusted tokens received during the launch window. */
+  boughtByWallet: Map<string, number>;
   /** Decimal-adjusted tokens the dev received in the creation transaction and the window. */
   devInitialUiAmount: number;
   /** True when the window contained more transactions than we were willing to fetch. */
@@ -42,7 +44,9 @@ export async function analyzeEarlyWindow(
   mint: string,
   creation: CreationResult,
 ): Promise<EarlyWindow> {
-  if (!creation.found) return { receipts: [], devInitialUiAmount: 0, truncated: false };
+  if (!creation.found) {
+    return { receipts: [], boughtByWallet: new Map(), devInitialUiAmount: 0, truncated: false };
+  }
 
   // The window is the wider of the two detectors' needs: same-slot bundling and
   // the first N seconds. Signatures are already oldest-first.
@@ -65,6 +69,7 @@ export async function analyzeEarlyWindow(
   }
 
   const receipts: EarlyReceipt[] = [];
+  const boughtByWallet = new Map<string, number>();
   let devInitialUiAmount = 0;
 
   for (const tx of parsed) {
@@ -83,6 +88,8 @@ export async function analyzeEarlyWindow(
         continue; // The dev is reported separately, never as a bundler or sniper.
       }
 
+      boughtByWallet.set(wallet, (boughtByWallet.get(wallet) ?? 0) + transfer.tokenAmount);
+
       receipts.push({
         wallet,
         slot: tx.slot,
@@ -94,7 +101,7 @@ export async function analyzeEarlyWindow(
     }
   }
 
-  return { receipts, devInitialUiAmount, truncated };
+  return { receipts, boughtByWallet, devInitialUiAmount, truncated };
 }
 
 /**

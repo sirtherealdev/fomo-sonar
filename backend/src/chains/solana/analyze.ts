@@ -122,26 +122,64 @@ export async function analyzeMint(client: HeliusClient, mint: string): Promise<A
   // --- Reports --------------------------------------------------------------
   const dev = buildDevReport(creation, early.devInitialUiAmount, decimals, holderMap, supply);
 
+  // How much of the supply a wallet set took at launch, whatever it holds now.
+  const boughtPctOf = (wallets: Iterable<string>): number => {
+    let ui = 0;
+    for (const wallet of wallets) ui += early.boughtByWallet.get(wallet) ?? 0;
+    return pctOf(BigInt(Math.round(ui * 10 ** decimals)), supply);
+  };
+
   const bundles: BundleReport = creation.found
     ? {
         walletCount: bundlerSet.size,
         holdingPct: holdingPctOf(bundlerSet, holderMap, supply).pct,
+        boughtPct: boughtPctOf(bundlerSet),
         clusters: buildClusters(bundlerSet, profiles, holderMap, supply),
       }
-    : { walletCount: 0, holdingPct: 0, clusters: [], unavailable: 'creation-not-found' };
+    : {
+        walletCount: 0,
+        holdingPct: 0,
+        boughtPct: 0,
+        clusters: [],
+        unavailable: 'creation-not-found',
+      };
 
   const snipers: CountAndHolding = creation.found
-    ? { count: sniperSet.size, holdingPct: holdingPctOf(sniperSet, holderMap, supply).pct }
-    : { count: 0, holdingPct: 0, unavailable: 'creation-not-found' };
+    ? {
+        count: sniperSet.size,
+        holdingPct: holdingPctOf(sniperSet, holderMap, supply).pct,
+        boughtPct: boughtPctOf(sniperSet),
+      }
+    : { count: 0, holdingPct: 0, boughtPct: null, unavailable: 'creation-not-found' };
 
   // The dev is reported on its own line, never folded into the fresh-wallet count.
   const freshAddresses = ranked.filter((address) => isFreshWallet(profiles.get(address), now));
   const freshWallets: CountAndHolding = {
     count: freshAddresses.length,
     holdingPct: holdingPctOf(freshAddresses, holderMap, supply).pct,
+    boughtPct: null,
   };
 
   const insiders = findInsiders(creation.dev, ranked, profiles, holderMap, supply);
+
+  // Label top holders that look like infrastructure rather than people.
+  const labelledHolders = topHolders.list.map((holder) => {
+    const profile = profiles.get(holder.address);
+    const txCount = profile?.knowsFullHistory === true ? profile.txCount : null;
+    // Busy AND big. Either one on its own says nothing useful.
+    const highActivity =
+      profile !== undefined &&
+      !profile.knowsFullHistory &&
+      holder.pct >= DETECTION.highActivityMinPct;
+    return { ...holder, txCount, highActivity };
+  });
+
+  const flaggedHolder = labelledHolders.find((h) => h.highActivity);
+  if (flaggedHolder) {
+    warnings.push(
+      `${flaggedHolder.pct.toFixed(1)}% is held by a wallet with over ${LIMITS.walletHistoryPageSize} transactions — likely an exchange or protocol wallet, not a single holder.`,
+    );
+  }
 
   // On Solana the question "can anyone change the rules" is answered by the
   // two authorities on the mint account. Both null is the safe state.
@@ -166,9 +204,11 @@ export async function analyzeMint(client: HeliusClient, mint: string): Promise<A
   const factorInputs: FactorInputs = {
     devHolding: dev.unavailable ? null : dev.holdingPct,
     devSold: dev.unavailable ? null : dev.soldPct,
-    bundles: bundles.unavailable ? null : bundles.holdingPct,
+    // Bundlers who already sold did their damage: a launch where same-slot
+    // wallets took half the supply is bundled whether or not they still hold it.
+    bundles: bundles.unavailable ? null : Math.max(bundles.holdingPct, bundles.boughtPct),
     topHolders: topHolders.list.length > 0 ? topHolders.top10Pct : null,
-    snipers: snipers.unavailable ? null : snipers.holdingPct,
+    snipers: snipers.unavailable ? null : Math.max(snipers.holdingPct, snipers.boughtPct ?? 0),
     freshWallets: freshWallets.holdingPct,
     insiders: insiders.unavailable ? null : insiders.holdingPct,
     authorities: authorityRisk(security),
@@ -190,7 +230,7 @@ export async function analyzeMint(client: HeliusClient, mint: string): Promise<A
     bundles,
     topHolders: {
       top10Pct: topHolders.top10Pct,
-      list: topHolders.list,
+      list: labelledHolders,
       excluded: topHolders.excluded,
     },
     snipers,
@@ -273,7 +313,7 @@ function findInsiders(
   holderMap: { balances: Map<string, bigint> },
   supply: bigint,
 ): CountAndHolding {
-  if (!dev) return { count: 0, holdingPct: 0, unavailable: 'creation-not-found' };
+  if (!dev) return { count: 0, holdingPct: 0, boughtPct: null, unavailable: 'creation-not-found' };
 
   const insiders = new Set<string>();
 
@@ -287,7 +327,11 @@ function findInsiders(
     insiders.add(devFunder);
   }
 
-  return { count: insiders.size, holdingPct: holdingPctOf(insiders, holderMap, supply).pct };
+  return {
+    count: insiders.size,
+    holdingPct: holdingPctOf(insiders, holderMap, supply).pct,
+    boughtPct: null,
+  };
 }
 
 /**

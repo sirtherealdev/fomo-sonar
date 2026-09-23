@@ -177,9 +177,11 @@ function signals(data: AnalyzeResponse): HTMLElement {
       data.dev.unavailable ? null : pct(data.dev.holdingPct),
       data.dev.unavailable ? unavailableText(data.dev.unavailable) : `${pct(data.dev.soldPct)} sold`,
     ),
-    countRow('Bundlers', data.bundles, `${count(data.bundles.walletCount)} wallets`),
-    row('Top 10 holders', pct(data.topHolders.top10Pct), 'excl. pools'),
-    countRow('Snipers', data.snipers, `${count(data.snipers.count)} wallets`),
+    // Bundlers and snipers report the worse of "holds now" and "took at launch":
+    // wallets that already sold their launch allocation must not read as clean.
+    launchRow('Bundlers', data.bundles.holdingPct, data.bundles.boughtPct, data.bundles.walletCount, data.bundles.unavailable),
+    row('Top 10 holders', pct(data.topHolders.top10Pct), topHolderNote(data)),
+    launchRow('Snipers', data.snipers.holdingPct, data.snipers.boughtPct, data.snipers.count, data.snipers.unavailable),
     countRow('Insiders', data.insiders, `${count(data.insiders.count)} wallets`),
     countRow('Fresh wallets', data.freshWallets, `${count(data.freshWallets.count)} wallets`),
   );
@@ -194,6 +196,35 @@ function countRow(
 ): HTMLElement {
   const unavailable = 'unavailable' in value ? value.unavailable : undefined;
   return row(name, unavailable ? null : pct(value.holdingPct), unavailable ? unavailableText(unavailable) : sub);
+}
+
+/**
+ * A launch-window signal. The headline figure is the worse of what the wallets
+ * hold now and what they took at launch, because a bundler that has already
+ * dumped is evidence of a bundled launch, not evidence of a clean one.
+ */
+function launchRow(
+  name: string,
+  holdingPct: number,
+  boughtPct: number | null,
+  wallets: number,
+  unavailable: string | undefined,
+): HTMLElement {
+  if (unavailable) return row(name, null, unavailableText(unavailable));
+
+  const bought = boughtPct ?? 0;
+  const sub =
+    bought > holdingPct + 0.5
+      ? `${count(wallets)} wallets · took ${pct(bought)}, sold most`
+      : `${count(wallets)} wallets`;
+
+  return row(name, pct(Math.max(holdingPct, bought)), sub);
+}
+
+function topHolderNote(data: AnalyzeResponse): string {
+  const flagged = data.topHolders.list.filter((h) => h.highActivity).length;
+  if (flagged > 0) return `incl. ${flagged} high-activity`;
+  return 'excl. pools';
 }
 
 function row(name: string, figure: string | null, sub: string): HTMLElement {
