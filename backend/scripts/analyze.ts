@@ -12,13 +12,19 @@
  */
 
 import { getAdapter, supportedChains } from '../src/chains/registry.ts';
+import { fileLaunchCache } from './launch-cache.ts';
 import { ChainNotSupportedError } from '../src/chains/types.ts';
 import type { AnalyzeResponse, ChainId } from '@scope/shared';
 
 const DIM = '\x1b[2m';
 const BOLD = '\x1b[1m';
 const RESET = '\x1b[0m';
-const COLORS = { low: '\x1b[32m', medium: '\x1b[33m', high: '\x1b[31m' } as const;
+const COLORS = {
+  low: '\x1b[32m',
+  medium: '\x1b[33m',
+  high: '\x1b[31m',
+  unknown: '\x1b[2m',
+} as const;
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -35,6 +41,8 @@ async function main(): Promise<void> {
   const env = {
     HELIUS_API_KEY: process.env['HELIUS_API_KEY'],
     EVM_RPC_URL: process.env['EVM_RPC_URL'],
+    // Pass --no-cache to force a full re-derivation of the launch.
+    launchCache: args.includes('--no-cache') ? undefined : fileLaunchCache,
   };
 
   let adapter;
@@ -99,7 +107,13 @@ function printReport(r: AnalyzeResponse): void {
   if (r.security.detail) console.log(`              ${DIM}${r.security.detail}${RESET}`);
 
   // --- Risk strip -----------------------------------------------------------
-  console.log(`  ${BOLD}risk        ${color}${r.riskScore}/100 ${r.riskLevel}${RESET}`);
+  // An unknown level means we could not measure enough to have an opinion, so
+  // printing the number next to it would invite reading it as a verdict.
+  console.log(
+    r.riskLevel === 'unknown'
+      ? `  ${BOLD}risk        ${color}unknown — only ${r.coverage}% of the signals could be measured${RESET}`
+      : `  ${BOLD}risk        ${color}${r.riskScore}/100 ${r.riskLevel}  ${DIM}(${r.coverage}% coverage)${RESET}`,
+  );
   if (r.scoreFloor) {
     console.log(
       `              ${DIM}floor ${r.scoreFloor.floor} forced by ${r.scoreFloor.key} at ${r.scoreFloor.value}%${RESET}`,

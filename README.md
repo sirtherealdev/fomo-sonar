@@ -188,10 +188,27 @@ transactions — a label that fires that often teaches people to ignore it.
 
 ### Known limits
 
-- Finding the creation transaction means paging backwards through the mint's
-  signatures, because RPC only returns newest-first. Capped at
-  `LIMITS.maxSignaturePages`; past that, dev/bundler/sniper detection reports
-  `creation-not-found` rather than guessing.
+- **A token's launch becomes unreadable fast.** RPC only returns signatures
+  newest-first, so reaching a token's first transaction means paging backwards
+  through its whole history, capped at `LIMITS.maxSignaturePages`. Measured on
+  a live token: it was readable, and ten minutes later it was not — it had
+  crossed 30,000 transactions. Past the cap, dev/bundler/sniper detection
+  reports `creation-not-found` rather than guessing.
+
+  This is why the launch cache is not an optimisation. Launch facts never
+  change, so they are stored permanently (Workers KV in production, a JSON
+  file for the CLI) and the first lookup of a young token preserves its launch
+  for everyone after. It also cuts a warm analysis from ~78 calls to ~49.
+
+  The remaining gap: a token nobody opened while it was young is lost to us.
+  Closing it properly means snapshotting launches as tokens appear rather than
+  waiting for someone to ask.
+
+- **We refuse to say "low" on an incomplete analysis.** When less than
+  `SCORING.minCoverageForLevel` of the scoring weight could be measured, the
+  level is `unknown` and the score is withheld. This came from a real result:
+  a token whose launch we could not read scored "3/100 low" — a green light on
+  a token nobody had checked for bundling, which is worse than showing nothing.
 - Dev "% sold" is measured against the allocation received in the launch
   window, so a dev who accumulated later is not counted.
 - Every truncation and every unavailable detector appears in `warnings[]`, and

@@ -12,11 +12,50 @@
 
 import type { AnalyzeResponse, ChainFamily, ChainId } from '@scope/shared';
 
+/**
+ * What happened at a token's launch never changes, so once we have paid to
+ * work it out we should never pay again. Current holdings are recomputed on
+ * every request — those are the part that moves.
+ *
+ * This exists because of a hard limit: RPC only returns signatures
+ * newest-first, so reaching a token's first transaction means paging backwards
+ * through its entire history. An active token outruns any sane page cap within
+ * about a day, and dev, bundler and sniper detection go dark with it.
+ *
+ * A permanent cache turns that from a wall into a race we usually win: Fomo is
+ * a launchpad, most tokens are looked at while they are young, and the first
+ * person to open one locks the answer in for everyone after them.
+ */
+export interface StoredLaunch {
+  signature: string;
+  dev: string;
+  slot: number;
+  /** Unix seconds. */
+  timestamp: number;
+  /** Decimal-adjusted tokens the dev received at launch. */
+  devInitialUiAmount: number;
+  /** Wallets that bought in the creation slot window. */
+  bundlers: string[];
+  /** Wallets that bought within the sniper window, excluding bundlers. */
+  snipers: string[];
+  /** wallet -> decimal-adjusted tokens taken during the launch window. */
+  bought: Record<string, number>;
+  /** True when the launch window held more transactions than we fetched. */
+  truncated: boolean;
+}
+
+export interface LaunchCache {
+  get(chain: ChainId, address: string): Promise<StoredLaunch | null>;
+  put(chain: ChainId, address: string, value: StoredLaunch): Promise<void>;
+}
+
 export interface AdapterEnv {
   /** Solana. Undefined on deployments that do not analyse Solana. */
   HELIUS_API_KEY?: string | undefined;
   /** EVM chains. */
   EVM_RPC_URL?: string | undefined;
+  /** Optional: without it every analysis re-walks history from scratch. */
+  launchCache?: LaunchCache | undefined;
 }
 
 export interface ChainAdapter {

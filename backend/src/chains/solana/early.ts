@@ -31,7 +31,14 @@ export interface EarlyReceipt {
 
 export interface EarlyWindow {
   receipts: EarlyReceipt[];
-  /** wallet -> decimal-adjusted tokens received during the launch window. */
+  /**
+   * wallet -> decimal-adjusted tokens *net* taken during the launch window.
+   *
+   * Net, not gross: tokens cycle between wallets while a launch is happening,
+   * and counting every inbound transfer made a set of bundlers appear to have
+   * bought 126% of the supply. Subtracting what a wallet sent back keeps the
+   * total bounded by what actually left the pool.
+   */
   boughtByWallet: Map<string, number>;
   /** Decimal-adjusted tokens the dev received in the creation transaction and the window. */
   devInitialUiAmount: number;
@@ -78,17 +85,23 @@ export async function analyzeEarlyWindow(
     for (const transfer of tx.tokenTransfers) {
       if (transfer.mint !== mint) continue;
 
+      // Anything this wallet sent back out during the window offsets what it took.
+      const sender = transfer.fromUserAccount;
+      if (sender && sender !== transfer.toUserAccount && !isBurnAddress(sender)) {
+        boughtByWallet.set(sender, (boughtByWallet.get(sender) ?? 0) - transfer.tokenAmount);
+      }
+
       const wallet = transfer.toUserAccount;
       if (!wallet) continue;
       if (wallet === transfer.fromUserAccount) continue;
       if (isBurnAddress(wallet) || knownProgramName(wallet)) continue;
 
+      boughtByWallet.set(wallet, (boughtByWallet.get(wallet) ?? 0) + transfer.tokenAmount);
+
       if (wallet === creation.dev) {
         devInitialUiAmount += transfer.tokenAmount;
         continue; // The dev is reported separately, never as a bundler or sniper.
       }
-
-      boughtByWallet.set(wallet, (boughtByWallet.get(wallet) ?? 0) + transfer.tokenAmount);
 
       receipts.push({
         wallet,
@@ -99,6 +112,12 @@ export async function analyzeEarlyWindow(
         signature: tx.signature,
       });
     }
+  }
+
+  // A wallet that sent out more than it took nets negative; clamp so it reads
+  // as "took nothing", never as a negative contribution to someone's total.
+  for (const [wallet, amount] of boughtByWallet) {
+    if (amount <= 0) boughtByWallet.delete(wallet);
   }
 
   return { receipts, boughtByWallet, devInitialUiAmount, truncated };

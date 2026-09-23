@@ -19,6 +19,6 @@ export const solanaAdapter: ChainAdapter = {
   analyze(address: string, env: AdapterEnv): Promise<AnalyzeResponse> {
     // Constructing the client here (not at module scope) keeps meta.rpcCalls
     // per-request rather than cumulative across the Worker's lifetime.
-    return analyzeMint(new HeliusClient(env.HELIUS_API_KEY ?? ''), address);
+    return analyzeMint(new HeliusClient(env.HELIUS_API_KEY ?? ''), address, env.launchCache);
   },
 };

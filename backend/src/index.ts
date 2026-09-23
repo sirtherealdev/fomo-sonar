@@ -13,7 +13,7 @@ import { Hono } from 'hono';
 import { CACHE } from './config.ts';
 import { HeliusError } from './chains/solana/helius.ts';
 import { getAdapter, implementedChains, supportedChains } from './chains/registry.ts';
-import { ChainNotSupportedError, UnknownChainError } from './chains/types.ts';
+import { ChainNotSupportedError, UnknownChainError, type LaunchCache, type StoredLaunch } from './chains/types.ts';
 import type { AnalyzeResponse, ApiError } from '@scope/shared';
 
 interface Env {
@@ -101,6 +101,7 @@ async function analyze(
     const result = await adapter.analyze(address, {
       HELIUS_API_KEY: env.HELIUS_API_KEY,
       EVM_RPC_URL: env.EVM_RPC_URL,
+      launchCache: launchCacheFrom(env.CACHE),
     });
 
     ctx.waitUntil(
@@ -130,6 +131,32 @@ async function analyze(
 }
 
 app.notFound((c) => c.json<ApiError>({ error: 'not_found', message: 'No such endpoint.' }, 404));
+
+/**
+ * Launch facts, stored forever.
+ *
+ * Deliberately never expires: what happened at a token's launch is history,
+ * and re-deriving it costs dozens of calls — or is impossible once the token's
+ * history has outrun our signature cap. The first lookup of a young token
+ * preserves its launch for every lookup after it.
+ *
+ * Shares the KV namespace with the response cache, under its own key prefix.
+ */
+function launchCacheFrom(kv: KVNamespace | undefined): LaunchCache | undefined {
+  if (!kv) return undefined;
+
+  const key = (chain: string, address: string): string => `launch:v2:${chain}:${address}`;
+
+  return {
+    async get(chain, address) {
+      const stored = await kv.get(key(chain, address));
+      return stored ? (JSON.parse(stored) as StoredLaunch) : null;
+    },
+    async put(chain, address, value) {
+      await kv.put(key(chain, address), JSON.stringify(value));
+    },
+  };
+}
 
 function json<T>(body: T, status: number): Response {
   return new Response(JSON.stringify(body), {
