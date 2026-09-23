@@ -1,9 +1,11 @@
 /**
- * Mint extraction is the one piece of logic that decides whether the panel
- * appears at all, so it gets real tests. Run with: npm test -w @scope/extension
+ * Address extraction decides whether the panel appears at all, so it gets real
+ * tests. Run with: npm test -w @scope/extension
  *
- * The URL shapes below are candidates until a real Fomo token page confirms
- * them — when it does, update URL_PATTERNS and these cases together.
+ * The confirmed Fomo shape is `/tokens/<chain>/<address>`. The first version of
+ * this file guessed `/token/` (singular) and would have matched nothing on
+ * every real page — hence the rule that the detector walks path segments
+ * rather than matching a list of route shapes.
  */
 
 import { strict as assert } from 'node:assert';
@@ -15,12 +17,12 @@ const EVM = '0x4200000000000000000000000000000000000006';
 
 describe('mintFromUrl', () => {
   const found: [string, string][] = [
-    ['path', `https://fomo.family/token/${MINT}`],
-    ['chain segment', `https://fomo.family/token/solana/${MINT}`],
-    ['coin route', `https://fomo.family/coin/${MINT}`],
-    ['short route', `https://fomo.family/t/${MINT}`],
-    ['trailing query', `https://fomo.family/trade/${MINT}?ref=abc`],
-    ['query parameter', `https://fomo.family/swap?mint=${MINT}`],
+    ['the real Fomo route', `https://fomo.family/tokens/solana/${MINT}`],
+    ['a trailing slash', `https://fomo.family/tokens/solana/${MINT}/`],
+    ['a query string', `https://fomo.family/tokens/solana/${MINT}?ref=abc`],
+    ['a route with no chain segment', `https://fomo.family/token/${MINT}`],
+    ['an unknown future route', `https://fomo.family/whatever/${MINT}`],
+    ['a query parameter', `https://fomo.family/swap?mint=${MINT}`],
   ];
 
   for (const [name, url] of found) {
@@ -33,7 +35,8 @@ describe('mintFromUrl', () => {
     ['home', 'https://fomo.family/'],
     ['leaderboard', 'https://fomo.family/leaderboard'],
     ['an article slug', 'https://fomo.family/answers/what-is-a-meme-coin'],
-    ['a non-address path', 'https://fomo.family/token/not-a-real-address'],
+    ['a non-address path', 'https://fomo.family/tokens/solana/not-a-real-address'],
+    ['the token list page', 'https://fomo.family/tokens/solana'],
   ];
 
   for (const [name, url] of notFound) {
@@ -59,22 +62,29 @@ describe('isValidAddress', () => {
 });
 
 describe('detectToken', () => {
-  it('reads a base58 address as Solana without needing a chain hint', () => {
+  it('reads the real Fomo token URL', () => {
+    assert.deepEqual(detectToken(`https://fomo.family/tokens/solana/${MINT}`), {
+      chain: 'solana',
+      address: MINT,
+    });
+  });
+
+  it('reads a base58 address as Solana even with no chain segment', () => {
     assert.deepEqual(detectToken(`https://fomo.family/token/${MINT}`), {
       chain: 'solana',
       address: MINT,
     });
   });
 
-  it('reads the chain from the path for an EVM address', () => {
-    assert.deepEqual(detectToken(`https://fomo.family/token/base/${EVM}`), {
+  it('reads the chain from the segment before an EVM address', () => {
+    assert.deepEqual(detectToken(`https://fomo.family/tokens/base/${EVM}`), {
       chain: 'base',
       address: EVM,
     });
   });
 
   it('maps bnb to bsc', () => {
-    assert.deepEqual(detectToken(`https://fomo.family/token/bnb/${EVM}`), {
+    assert.deepEqual(detectToken(`https://fomo.family/tokens/bnb/${EVM}`), {
       chain: 'bsc',
       address: EVM,
     });
@@ -83,6 +93,6 @@ describe('detectToken', () => {
   it('refuses an EVM address with no chain in the URL', () => {
     // Guessing here would mean reading Base's address against Ethereum's state
     // and reporting a confident, completely wrong result.
-    assert.equal(detectToken(`https://fomo.family/token/${EVM}`), null);
+    assert.equal(detectToken(`https://fomo.family/tokens/${EVM}`), null);
   });
 });

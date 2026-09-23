@@ -51,19 +51,15 @@ const CHAIN_ALIASES: Record<string, ChainId> = {
 };
 
 /**
- * Fomo token-page URL shapes.
+ * Fomo token pages are `/tokens/<chain>/<address>`, confirmed against a real
+ * page. Rather than matching that one shape, we walk the path segments and
+ * look for an address: whichever segment is a valid address is the token, and
+ * the segment before it names the chain when it names anything we know.
  *
- * TODO(confirm): these are candidates until we have seen a real Fomo token
- * page. The list is ordered; the first pattern whose capture group is a valid
- * address wins. Adding a shape means adding one line here and nothing else.
+ * That survives Fomo renaming or reordering its routes, which a list of
+ * regexes would not — the first version of this file guessed `/token/` and
+ * would have silently shown nothing on every page.
  */
-const ADDRESS = '(0x[0-9a-fA-F]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})';
-const URL_PATTERNS: readonly RegExp[] = [
-  new RegExp(`/token/(?:[a-z]+/)?${ADDRESS}`, 'i'),
-  new RegExp(`/coin/${ADDRESS}`, 'i'),
-  new RegExp(`/t/${ADDRESS}`, 'i'),
-  new RegExp(`/trade/${ADDRESS}`, 'i'),
-];
 
 /** Hosts whose links reliably carry a mint address in a known path position. */
 const EXPLORER_PATTERNS: readonly RegExp[] = [
@@ -76,19 +72,6 @@ const EXPLORER_PATTERNS: readonly RegExp[] = [
 
 export function isValidAddress(value: string): boolean {
   return BASE58_ADDRESS.test(value);
-}
-
-/** The chain named somewhere in the URL path, if any. */
-export function chainFromUrl(url: string): ChainId | null {
-  try {
-    for (const segment of new URL(url).pathname.split('/')) {
-      const chain = CHAIN_ALIASES[segment.toLowerCase()];
-      if (chain) return chain;
-    }
-  } catch {
-    // Malformed URL: nothing to read.
-  }
-  return null;
 }
 
 /**
@@ -113,14 +96,38 @@ export function isTokenAddress(value: string): boolean {
   return BASE58_ADDRESS.test(value) || EVM_ADDRESS.test(value);
 }
 
-/** Token address from the URL, or null if this is not a token page. */
-export function mintFromUrl(url: string): string | null {
-  for (const pattern of URL_PATTERNS) {
-    const address = pattern.exec(url)?.[1];
-    if (address && isTokenAddress(address)) return address;
+interface PathToken {
+  address: string;
+  /** The segment before the address, when it names a chain we know. */
+  chain: ChainId | null;
+}
+
+/** Walk the path for an address, and note what precedes it. */
+function tokenFromPath(url: string): PathToken | null {
+  let segments: string[];
+  try {
+    segments = new URL(url).pathname.split('/').filter(Boolean);
+  } catch {
+    return null; // Malformed URL: nothing to read.
   }
 
-  // Some apps carry the address in a query parameter instead of the path.
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
+    if (!segment || !isTokenAddress(segment)) continue;
+
+    const previous = segments[i - 1]?.toLowerCase();
+    return { address: segment, chain: (previous ? CHAIN_ALIASES[previous] : undefined) ?? null };
+  }
+
+  return null;
+}
+
+/** Token address from the URL, or null if this is not a token page. */
+export function mintFromUrl(url: string): string | null {
+  const fromPath = tokenFromPath(url);
+  if (fromPath) return fromPath.address;
+
+  // Some routes carry the address in a query parameter instead of the path.
   try {
     for (const value of new URL(url).searchParams.values()) {
       if (isTokenAddress(value)) return value;
@@ -129,6 +136,23 @@ export function mintFromUrl(url: string): string | null {
     // Malformed URL: nothing to read, and definitely nothing to throw over.
   }
 
+  return null;
+}
+
+/** The chain named in the URL path, if any. */
+export function chainFromUrl(url: string): ChainId | null {
+  const fromPath = tokenFromPath(url);
+  if (fromPath?.chain) return fromPath.chain;
+
+  // No address in the path yet: fall back to any chain segment at all.
+  try {
+    for (const segment of new URL(url).pathname.split('/')) {
+      const chain = CHAIN_ALIASES[segment.toLowerCase()];
+      if (chain) return chain;
+    }
+  } catch {
+    // Malformed URL: nothing to read.
+  }
   return null;
 }
 
