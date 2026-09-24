@@ -90,13 +90,28 @@ export async function analyzeMint(
     baseWarnings.push('No DEX pool found for this token, so price and liquidity are unavailable.');
   }
 
-  // On Solana the question "can anyone change the rules" is answered by the
-  // two authorities on the mint account. Both null is the safe state.
+  /*
+   * "Can anyone change the rules on me after I buy?"
+   *
+   * On Solana that is the two mint authorities plus the Token-2022 extensions,
+   * all of which arrive in the single getAccountInfo we already made. The
+   * extensions are the sharper end: a permanent delegate can take tokens out
+   * of any wallet, and a transfer hook runs code we have not read on every
+   * transfer.
+   */
   const security: SecurityInfo = {
     canMintMore: mintAccount.mintAuthority !== null,
     canFreeze: mintAccount.freezeAuthority !== null,
-    controller: mintAccount.mintAuthority ?? mintAccount.freezeAuthority,
-    detail: describeAuthorities(mintAccount.mintAuthority, mintAccount.freezeAuthority),
+    canSeize: mintAccount.permanentDelegate !== null,
+    hasTransferHook: mintAccount.transferHookProgram !== null,
+    transferTaxPct: round2(mintAccount.transferFeeBasisPoints / 100),
+    taxCanChange:
+      mintAccount.transferFeeAuthority !== null && mintAccount.transferFeeBasisPoints >= 0,
+    controller:
+      mintAccount.permanentDelegate ??
+      mintAccount.mintAuthority ??
+      mintAccount.freezeAuthority,
+    detail: describeControls(mintAccount),
   };
 
   // DexScreener carries the socials and the image the token actually ships
@@ -417,16 +432,51 @@ function buildLaunch(
  * live freeze authority is milder but still means your balance can be locked.
  */
 function authorityRisk(security: SecurityInfo): number {
-  if (security.canMintMore) return 100;
-  if (security.canFreeze) return 50;
-  return 0;
+  /*
+   * The worst single power wins rather than summing: two ways to lose your
+   * position is not meaningfully worse than one, and averaging them would let
+   * a token with a seizure delegate look moderate.
+   */
+  return Math.max(
+    security.canMintMore ? 100 : 0,
+    security.canSeize ? 100 : 0,
+    security.hasTransferHook ? 80 : 0,
+    // A changeable tax is a tax of any size the authority likes, later.
+    security.taxCanChange ? 70 : 0,
+    // 12.5% and above scores as badly as it gets on tax alone.
+    Math.min(100, security.transferTaxPct * 8),
+    security.canFreeze ? 50 : 0,
+  );
 }
 
-function describeAuthorities(mintAuthority: string | null, freezeAuthority: string | null): string {
-  if (mintAuthority && freezeAuthority) return 'Mint and freeze authority are both still live.';
-  if (mintAuthority) return 'Mint authority is still live: supply can be increased.';
-  if (freezeAuthority) return 'Freeze authority is still live: balances can be frozen.';
-  return 'Mint and freeze authority are both revoked.';
+/** Plain English for whatever powers are still live. */
+function describeControls(mint: {
+  mintAuthority: string | null;
+  freezeAuthority: string | null;
+  permanentDelegate: string | null;
+  transferHookProgram: string | null;
+  transferFeeBasisPoints: number;
+  transferFeeAuthority: string | null;
+}): string {
+  const live: string[] = [];
+
+  if (mint.permanentDelegate) live.push('a permanent delegate can move tokens out of any wallet');
+  if (mint.mintAuthority) live.push('mint authority is live, so supply can be increased');
+  if (mint.transferHookProgram) live.push('every transfer runs a third-party program');
+  if (mint.transferFeeBasisPoints > 0) {
+    const pct = round2(mint.transferFeeBasisPoints / 100);
+    live.push(
+      mint.transferFeeAuthority
+        ? `${pct}% transfer tax, and an authority can change it`
+        : `${pct}% transfer tax`,
+    );
+  } else if (mint.transferFeeAuthority) {
+    live.push('no transfer tax today, but an authority can add one');
+  }
+  if (mint.freezeAuthority) live.push('freeze authority is live, so balances can be frozen');
+
+  if (live.length === 0) return 'No mint, freeze, seizure or tax powers remain.';
+  return `${live[0]!.charAt(0).toUpperCase()}${live[0]!.slice(1)}${live.length > 1 ? `; ${live.slice(1).join('; ')}` : ''}.`;
 }
 
 function buildDevReport(

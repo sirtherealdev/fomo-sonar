@@ -201,7 +201,7 @@ Each detector is one file in `backend/src/analysis/`, commented in place.
 | **Snipers** | Buyers inside the first `sniperWindowSeconds`, excluding bundlers so the score cannot count a wallet twice. |
 | **Fresh wallets** | Holders with `<= freshWalletMaxTxCount` lifetime transactions, or first seen less than `freshWalletMaxAgeHours` ago. |
 | **Insiders** | Notable wallets whose first SOL came from the dev, plus the dev's own funder when it also holds. One hop only — deeper graph walks mostly find exchange hot wallets. |
-| **Authorities** | Can anyone still mint more supply or freeze balances? On Solana that is the mint and freeze authorities; on EVM it is an un-renounced owner. The panel sees one chain-neutral answer. |
+| **Token controls** | Can anyone change the rules after you buy? Mint and freeze authorities, plus the Token-2022 extensions that arrive free with the same call: a **permanent delegate** (can move tokens out of any wallet), a **transfer hook** (runs third-party code on every transfer), and the **transfer tax** — including whether an authority can still raise it. Scored on the worst single power, not the sum. |
 | **Risk score** | Weighted sum of the percentages above, each through a safe→danger ramp, plus per-signal **critical floors**: if one signal is severe enough on its own, the score cannot fall below its floor. Without that, a weighted sum over eight factors averages one catastrophic signal into a reassuring "medium". A signal we could not measure is dropped and its weight redistributed — never scored as zero. |
 
 ### Headline data
