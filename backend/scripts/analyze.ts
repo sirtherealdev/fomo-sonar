@@ -102,7 +102,7 @@ function printReport(r: AnalyzeResponse): void {
     console.log(`  market      ${DIM}no DEX pool found${RESET}`);
   }
   console.log(
-    `  holders     ${r.holderCount}   can mint more ${flag(!r.security.canMintMore)}   can freeze ${flag(!r.security.canFreeze)}`,
+    `  holders     ${r.holderCount}   mint ${flag(!r.security.canMintMore)}  freeze ${flag(!r.security.canFreeze)}  seize ${flag(!r.security.canSeize)}  hook ${flag(!r.security.hasTransferHook)}  tax ${r.security.transferTaxPct}%${r.security.taxCanChange ? ' (changeable)' : ''}`,
   );
   if (r.security.detail) console.log(`              ${DIM}${r.security.detail}${RESET}`);
 

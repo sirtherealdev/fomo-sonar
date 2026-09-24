@@ -303,6 +303,20 @@ function row(name: string, figure: string | null, sub: string, pending = false):
 function securityFlags(data: AnalyzeResponse): HTMLElement | null {
   const wrap = el('div', 'flags');
 
+  /*
+   * Dangers first, and only name the safe states that are worth confirming.
+   * A wall of green "revoked" chips trains people to stop reading the row,
+   * which is the row most worth reading.
+   */
+  if (data.security.canSeize) wrap.append(flag('Can seize tokens', false));
+  if (data.security.hasTransferHook) wrap.append(flag('Transfer hook', false));
+  if (data.security.transferTaxPct > 0) {
+    wrap.append(flag(`${data.security.transferTaxPct}% tax`, false));
+  }
+  if (data.security.taxCanChange && data.security.transferTaxPct === 0) {
+    wrap.append(flag('Tax can be added', false));
+  }
+
   wrap.append(
     flag(data.security.canMintMore ? 'Can mint more' : 'Mint revoked', !data.security.canMintMore),
     flag(data.security.canFreeze ? 'Can freeze' : 'Freeze revoked', !data.security.canFreeze),

@@ -157,6 +157,23 @@ export interface SecurityInfo {
   canMintMore: boolean;
   /** Someone can still freeze or pause balances. */
   canFreeze: boolean;
+  /**
+   * Someone can move tokens out of any wallet without the holder's consent.
+   *
+   * On Solana this is the Token-2022 permanent delegate. It is the severest
+   * of these powers, and no risk panel we compared against surfaces it.
+   */
+  canSeize: boolean;
+  /**
+   * Every transfer runs third-party code that can block or alter it — the
+   * Token-2022 transfer hook. Whatever it does today, it can do something
+   * else tomorrow.
+   */
+  hasTransferHook: boolean;
+  /** Tax taken on every transfer, in percent. 0 when there is none. */
+  transferTaxPct: number;
+  /** An authority can still change that tax, including adding or raising one. */
+  taxCanChange: boolean;
   /** Address holding that power, when there is a single one. */
   controller: string | null;
   /** Chain-specific detail, for the "why" line in the panel. */

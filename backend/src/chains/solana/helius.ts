@@ -33,7 +33,13 @@ export interface SignatureInfo {
   err: unknown | null;
 }
 
-/** The SPL mint account, parsed. Supply, decimals and both authorities in one call. */
+/**
+ * The SPL mint account, parsed.
+ *
+ * Supply, decimals, both authorities and the Token-2022 extensions, all from a
+ * single call — the extensions come along for free with the same
+ * getAccountInfo we already needed for supply.
+ */
 export interface MintAccount {
   supply: string;
   decimals: number;
@@ -41,6 +47,20 @@ export interface MintAccount {
   mintAuthority: string | null;
   /** null means revoked: nobody can freeze balances. */
   freezeAuthority: string | null;
+  /** Someone who can move tokens out of any wallet. */
+  permanentDelegate: string | null;
+  /** A program that runs on every transfer and can block it. */
+  transferHookProgram: string | null;
+  /** Transfer tax in basis points. */
+  transferFeeBasisPoints: number;
+  /** An authority that can change the transfer tax. */
+  transferFeeAuthority: string | null;
+}
+
+/** One entry of the parsed `extensions` array on a Token-2022 mint. */
+interface MintExtension {
+  extension?: string;
+  state?: Record<string, unknown>;
 }
 
 /** DAS metadata, narrowed to the fields the panel header needs. */
@@ -201,6 +221,7 @@ export class HeliusClient {
               decimals?: number;
               mintAuthority?: string | null;
               freezeAuthority?: string | null;
+              extensions?: MintExtension[];
             };
           };
         };
@@ -212,11 +233,30 @@ export class HeliusClient {
       throw new HeliusError(`${mint} is not an SPL mint account`);
     }
 
+    const extensions = (info.extensions ?? []) as MintExtension[];
+    const find = (name: string): Record<string, unknown> | undefined =>
+      extensions.find((e) => e.extension === name)?.state;
+
+    const fee = find('transferFeeConfig');
+    /*
+     * A transfer fee carries two schedules, the current one and one that takes
+     * effect at a later epoch. Working out which applies would cost another
+     * call for the current epoch, so we take the higher: it is the one that
+     * can cost the holder more, and understating a tax is the worse error.
+     */
+    const feeSchedules = [fee?.['newerTransferFee'], fee?.['olderTransferFee']]
+      .map((f) => Number((f as { transferFeeBasisPoints?: number } | undefined)?.transferFeeBasisPoints ?? 0))
+      .filter((n) => Number.isFinite(n));
+
     return {
       supply: info.supply,
       decimals: info.decimals,
       mintAuthority: info.mintAuthority ?? null,
       freezeAuthority: info.freezeAuthority ?? null,
+      permanentDelegate: asAddress(find('permanentDelegate')?.['delegate']),
+      transferHookProgram: asAddress(find('transferHook')?.['programId']),
+      transferFeeBasisPoints: Math.max(0, ...feeSchedules),
+      transferFeeAuthority: asAddress(fee?.['transferFeeConfigAuthority']),
     };
   }
 
@@ -336,6 +376,12 @@ export class HeliusClient {
     }>('getMultipleAccounts', [tokenAccounts, { encoding: 'jsonParsed' }]);
     return res.value.map((acc) => acc?.data?.parsed?.info?.owner ?? null);
   }
+}
+
+/** Extension fields are typed loosely and use the system program for "none". */
+function asAddress(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length === 0) return null;
+  return value === '11111111111111111111111111111111' ? null : value;
 }
 
 function sleep(ms: number): Promise<void> {
