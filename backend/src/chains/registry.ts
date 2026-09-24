@@ -32,7 +32,14 @@ export function supportedChains(): ChainId[] {
   return Object.keys(ADAPTERS) as ChainId[];
 }
 
-/** Chains whose adapter is actually implemented, for /health and the extension. */
+/**
+ * Chains we can actually analyse right now.
+ *
+ * Ethereum, BNB Chain and Arc are deliberately absent. The EVM adapter runs
+ * them fine; their free public endpoints will not serve historical state or
+ * logs, and a launch cannot be read without one of those. A clear "not yet"
+ * beats a report with its most useful half missing.
+ */
 export function implementedChains(): ChainId[] {
-  return ['solana'];
+  return ['solana', 'base', 'monad', 'robinhood'];
 }

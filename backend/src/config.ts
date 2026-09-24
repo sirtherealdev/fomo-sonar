@@ -20,6 +20,13 @@ export const DETECTION = {
    */
   bundleSlotWindow: 2,
 
+  /**
+   * Bundlers on EVM: wallets that received tokens in the mint's block, or
+   * within this many blocks of it. The block is the EVM analogue of Solana's
+   * slot — one block is one bundle, not separate people reacting.
+   */
+  bundleBlockWindow: 1,
+
   /** Snipers: buyers within this many seconds of the creation transaction. */
   sniperWindowSeconds: 10,
 
@@ -242,6 +249,23 @@ export const LIMITS = {
    * failure cost more than success.
    */
   blockScanTotalBlocks: 45,
+
+  /**
+   * eth_getLogs queries allowed per token when rebuilding the EVM holder set.
+   *
+   * Each covers that chain's maximum block range, so the reachable history
+   * varies by endpoint: 60 queries is ~120,000 blocks on Base (roughly three
+   * days) and only 6,000 on Monad. Past the budget the holder set is reported
+   * as partial rather than as a number computed from half the transfers.
+   */
+  evmMaxLogQueries: 60,
+
+  /**
+   * Rounds of widening when searching for a launch by logs, used on the
+   * endpoints that cannot answer historical state. Each round scans one
+   * maximum-range window either side of the estimate.
+   */
+  evmLaunchSearchRounds: 6,
 
 
   /**

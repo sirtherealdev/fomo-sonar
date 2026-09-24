@@ -4,7 +4,20 @@ Read-only token risk overlay for [Fomo Web](https://fomo.family).
 
 Fomo supports seven chains — Solana, Base, BNB Chain, Monad, Robinhood Chain,
 Arc and Ethereum. Six of those are EVM, so the backend needs two adapters, not
-seven implementations. **Solana is implemented; the EVM adapter is a stub.**
+seven implementations.
+
+**Working: Solana, Base, Monad, Robinhood Chain.** BNB Chain, Arc and Ethereum
+have the same adapter but no endpoint that will serve their history — see
+[`chains/evm/chains.ts`](backend/src/chains/evm/chains.ts). They are one RPC
+key away, not one feature away.
+
+On EVM the primitives differ but the report does not. The deployment block
+comes from a binary search on `eth_getCode` — historical state answers whether
+the contract existed yet — and where an endpoint has no archive, from scanning
+Transfer logs around an estimated block for the mint. Holders are rebuilt from
+Transfer logs, and a holder with bytecode is excluded as a pool the same way a
+program-owned account is on Solana. Fresh wallets are cheaper here than
+anywhere: a nonce is an exact lifetime transaction count in one call.
 
 The extension detects when you are on a token page, reads the mint address, and
 shows the numbers you would otherwise open a second terminal for: price, market
