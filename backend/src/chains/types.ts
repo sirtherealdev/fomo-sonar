@@ -10,7 +10,7 @@
  * in the codebase should ever branch on a chain id.
  */
 
-import type { AnalyzeResponse, ChainFamily, ChainId } from '@scope/shared';
+import type { AnalyzeResponse, ChainFamily, ChainId } from '@sonar/shared';
 
 /**
  * What happened at a token's launch never changes, so once we have paid to

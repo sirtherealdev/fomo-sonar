@@ -1,6 +1,6 @@
 /**
  * Address extraction decides whether the panel appears at all, so it gets real
- * tests. Run with: npm test -w @scope/extension
+ * tests. Run with: npm test -w @sonar/extension
  *
  * The confirmed Fomo shape is `/tokens/<chain>/<address>`. The first version of
  * this file guessed `/token/` (singular) and would have matched nothing on

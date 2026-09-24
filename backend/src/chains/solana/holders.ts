@@ -22,7 +22,7 @@ import { DETECTION, LIMITS } from '../../config.ts';
 import type { HeliusClient } from './helius.ts';
 import { isBurnAddress, knownProgramName, SYSTEM_PROGRAM } from './known-accounts.ts';
 import { pctOf } from '../../util.ts';
-import type { ExcludedAccount, HolderEntry } from '@scope/shared';
+import type { ExcludedAccount, HolderEntry } from '@sonar/shared';
 
 export interface HolderMap {
   /** wallet -> balance in base units. Zero balances are not included. */

@@ -2,7 +2,7 @@
 
 import { HeliusClient } from './helius.ts';
 import { analyzeMint } from './analyze.ts';
-import type { AnalyzeResponse, ChainFamily, ChainId } from '@scope/shared';
+import type { AnalyzeResponse, ChainFamily, ChainId } from '@sonar/shared';
 import type { AdapterEnv, ChainAdapter } from '../types.ts';
 
 /** 32 bytes of base58: 32-44 characters, excluding 0, O, I and l. */

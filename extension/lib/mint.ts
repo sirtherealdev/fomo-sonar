@@ -13,7 +13,7 @@
  * calls the page did not already make.
  */
 
-import type { ChainId } from '@scope/shared';
+import type { ChainId } from '@sonar/shared';
 
 /** A token is only identified by chain AND address: 0x… is ambiguous on its own. */
 export interface TokenRef {

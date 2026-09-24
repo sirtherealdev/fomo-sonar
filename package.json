@@ -1,5 +1,5 @@
 {
-  "name": "scope-scanner",
+  "name": "fomo-sonar",
   "private": true,
   "version": "0.1.0",
   "description": "Read-only token risk overlay for Fomo Web",
@@ -9,11 +9,11 @@
     "extension"
   ],
   "scripts": {
-    "analyze": "npm run analyze -w @scope/backend --",
-    "dev:api": "npm run dev -w @scope/backend",
-    "typecheck": "npm run typecheck -w @scope/shared && npm run typecheck -w @scope/backend && npm run typecheck -w @scope/extension",
-    "dev:ext": "npm run dev -w @scope/extension",
-    "build:ext": "npm run build:local -w @scope/extension"
+    "analyze": "npm run analyze -w @sonar/backend --",
+    "dev:api": "npm run dev -w @sonar/backend",
+    "typecheck": "npm run typecheck -w @sonar/shared && npm run typecheck -w @sonar/backend && npm run typecheck -w @sonar/extension",
+    "dev:ext": "npm run dev -w @sonar/extension",
+    "build:ext": "npm run build:local -w @sonar/extension"
   },
   "engines": {
     "node": ">=20"

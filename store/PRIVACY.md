@@ -1,8 +1,8 @@
-# SCOPE Scanner — Privacy Policy
+# SONAR — Privacy Policy
 
 _Last updated: 2026-09-25_
 
-SCOPE Scanner does not collect, store, sell or share personal information.
+SONAR does not collect, store, sell or share personal information.
 
 ## What the extension reads
 
@@ -32,7 +32,7 @@ collapsed it. That is stored on your own device and is never transmitted.
 One request, to our own backend:
 
 ```
-GET https://scope-scanner-api.phillipk0.workers.dev/analyze/<chain>/<address>
+GET https://sonar-api.phillipk0.workers.dev/analyze/<chain>/<address>
 ```
 
 It carries the chain name and the public token address, and nothing else — no

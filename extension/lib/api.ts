@@ -13,7 +13,7 @@
  */
 
 import { API_BASE } from './config';
-import type { AnalyzeResponse, ApiError, ChainId } from '@scope/shared';
+import type { AnalyzeResponse, ApiError, ChainId } from '@sonar/shared';
 
 export type AnalyzeResult =
   | { status: 'ok'; data: AnalyzeResponse }

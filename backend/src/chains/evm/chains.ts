@@ -14,7 +14,7 @@
  * real analysis.
  */
 
-import type { ChainId } from '@scope/shared';
+import type { ChainId } from '@sonar/shared';
 
 export interface EvmChain {
   chainId: number;

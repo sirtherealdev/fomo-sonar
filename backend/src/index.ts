@@ -1,5 +1,5 @@
 /**
- * SCOPE Scanner API — Cloudflare Worker.
+ * SONAR API — Cloudflare Worker.
  *
  *   GET /analyze/:chain/:address
  *   GET /analyze/:address          (Solana, kept for the original clients)
@@ -14,7 +14,7 @@ import { CACHE } from './config.ts';
 import { HeliusError } from './chains/solana/helius.ts';
 import { getAdapter, implementedChains, supportedChains } from './chains/registry.ts';
 import { ChainNotSupportedError, UnknownChainError, type LaunchCache, type StoredLaunch } from './chains/types.ts';
-import type { AnalyzeResponse, ApiError } from '@scope/shared';
+import type { AnalyzeResponse, ApiError } from '@sonar/shared';
 
 /** Cloudflare's rate limit binding, narrowed to what we call. */
 interface RateLimiter {

@@ -19,7 +19,7 @@ import { hexToBigInt, hexToNumber, topicToAddress, ZERO_ADDRESS } from './helper
 import { transfersInRange } from './launch.ts';
 import { assetTransfers } from './transfers.ts';
 import type { EvmClient } from './rpc.ts';
-import type { ExcludedAccount, HolderEntry } from '@scope/shared';
+import type { ExcludedAccount, HolderEntry } from '@sonar/shared';
 
 export interface EvmHolders {
   balances: Map<string, bigint>;

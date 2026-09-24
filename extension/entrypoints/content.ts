@@ -1,5 +1,5 @@
 /**
- * SCOPE Scanner content script.
+ * SONAR content script.
  *
  * Detects which token the user is looking at — including after in-app
  * navigation — asks our backend about it, and renders the result in a closed

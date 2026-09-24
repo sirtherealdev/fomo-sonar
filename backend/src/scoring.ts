@@ -10,7 +10,7 @@
 
 import { SCORING } from './config.ts';
 import { clamp, round2 } from './util.ts';
-import type { RiskFactor, RiskLevel, ScoreFloor } from '@scope/shared';
+import type { RiskFactor, RiskLevel, ScoreFloor } from '@sonar/shared';
 
 type FactorKey = RiskFactor['key'];
 

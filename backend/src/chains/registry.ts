@@ -6,7 +6,7 @@
  * adapter, the abstraction has sprung a leak.
  */
 
-import type { ChainId } from '@scope/shared';
+import type { ChainId } from '@sonar/shared';
 import { solanaAdapter } from './solana/index.ts';
 import { createEvmAdapter } from './evm/index.ts';
 import { UnknownChainError, type ChainAdapter } from './types.ts';

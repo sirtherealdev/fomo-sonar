@@ -21,7 +21,7 @@ import { PANEL_STYLES } from './panel.styles';
 import { count, pct, shortAddress } from './format';
 import { loadPanelState, savePanelState, type PanelState } from './storage';
 import type { AnalyzeResult } from './api';
-import type { AnalyzeResponse, CountAndHolding } from '@scope/shared';
+import type { AnalyzeResponse, CountAndHolding } from '@sonar/shared';
 
 export interface Panel {
   showLoading(label: string): void;
@@ -33,7 +33,7 @@ export interface Panel {
 export async function createPanel(): Promise<Panel> {
   const state = await loadPanelState();
 
-  const host = document.createElement('scope-scanner-panel');
+  const host = document.createElement('fomo-sonar-panel');
   const shadow = host.attachShadow({ mode: 'closed' });
 
   const style = document.createElement('style');

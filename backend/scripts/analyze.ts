@@ -14,7 +14,7 @@
 import { getAdapter, supportedChains } from '../src/chains/registry.ts';
 import { fileLaunchCache } from './launch-cache.ts';
 import { ChainNotSupportedError } from '../src/chains/types.ts';
-import type { AnalyzeResponse, ChainId } from '@scope/shared';
+import type { AnalyzeResponse, ChainId } from '@sonar/shared';
 
 const DIM = '\x1b[2m';
 const BOLD = '\x1b[1m';
