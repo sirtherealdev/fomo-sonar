@@ -6,10 +6,17 @@ Fomo supports seven chains — Solana, Base, BNB Chain, Monad, Robinhood Chain,
 Arc and Ethereum. Six of those are EVM, so the backend needs two adapters, not
 seven implementations.
 
-**Working: Solana, Base, Monad, Robinhood Chain.** BNB Chain, Arc and Ethereum
-have the same adapter but no endpoint that will serve their history — see
-[`chains/evm/chains.ts`](backend/src/chains/evm/chains.ts). They are one RPC
-key away, not one feature away.
+**All seven work**, verified in production against real tokens: Solana via
+Helius, the six EVM chains via one Alchemy key.
+
+Monad is the exception to "verified": its adapter runs and the transfer API
+answers, but no Monad memecoin is indexed anywhere we can find one yet, so it
+has never been tested against a real launch.
+
+The EVM chains need the key rather than a public endpoint, for a reason worth
+knowing: public endpoints throttle Cloudflare's shared egress immediately, so
+everything that works from a laptop returns 429 from the Worker. A key is
+identified by key, not by IP.
 
 On EVM the primitives differ but the report does not. The deployment block
 comes from a binary search on `eth_getCode` — historical state answers whether

@@ -247,7 +247,14 @@ export async function analyzeMint(
     }
 
     const factorInputs: FactorInputs = {
-      devHolding: devReport.unavailable ? null : devReport.holdingPct,
+      /*
+       * These two fail independently. A dev that took no allocation still has
+       * a measurable current holding — zero — and "% of an allocation sold"
+       * is the only part with no denominator. Dropping both together threw
+       * away a good signal and pushed coverage under the threshold, so a
+       * perfectly readable token reported as unknown.
+       */
+      devHolding: devReport.address === null ? null : devReport.holdingPct,
       devSold: devReport.unavailable ? null : devReport.soldPct,
       // Bundlers who already sold did their damage: a launch where same-slot
       // wallets took half the supply is bundled whether or not they still hold it.

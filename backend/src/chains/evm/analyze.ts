@@ -147,7 +147,14 @@ export async function analyzeEvmToken(
       : { count: 0, holdingPct: 0, boughtPct: null, unavailable: 'pending' };
 
     const factorInputs: FactorInputs = {
-      devHolding: devReport.unavailable ? null : devReport.holdingPct,
+      /*
+       * These two fail independently. A dev that took no allocation still has
+       * a measurable current holding — zero — and "% of an allocation sold"
+       * is the only part with no denominator. Dropping both together threw
+       * away a good signal and pushed coverage under the threshold, so a
+       * perfectly readable token reported as unknown.
+       */
+      devHolding: devReport.address === null ? null : devReport.holdingPct,
       devSold: devReport.unavailable ? null : devReport.soldPct,
       bundles: bundles.unavailable ? null : Math.max(bundles.holdingPct, bundles.boughtPct),
       topHolders: holders && holders.top.length > 0 ? holders.top10Pct : null,
