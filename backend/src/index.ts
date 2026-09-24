@@ -24,8 +24,8 @@ interface RateLimiter {
 interface Env {
   /** Solana. */
   HELIUS_API_KEY: string;
-  /** EVM chains. */
-  EVM_RPC_URL?: string;
+  /** EVM chains, all of them, through one Alchemy key. */
+  ALCHEMY_API_KEY?: string;
   /** Optional: the Worker runs without it, just uncached. */
   CACHE?: KVNamespace;
   /** Optional: absent in local dev, where there is nobody to rate limit. */
@@ -92,11 +92,15 @@ app.get('/health', (c) =>
   c.json({
     ok: true,
     chains: supportedChains(),
-    implemented: implementedChains(),
-    // Which optional bindings this deployment actually has. Both are silent
-    // when missing — no cache just means slow, no limiter means unprotected —
-    // so they need to be visible somewhere.
-    bindings: { cache: Boolean(c.env.CACHE), rateLimiter: Boolean(c.env.RATE_LIMITER) },
+    implemented: implementedChains(Boolean(c.env.ALCHEMY_API_KEY)),
+    // Which optional bindings this deployment actually has. All three fail
+    // silently when missing — no cache is merely slow, no limiter is
+    // unprotected, no EVM key quietly drops four chains — so they are visible.
+    bindings: {
+      cache: Boolean(c.env.CACHE),
+      rateLimiter: Boolean(c.env.RATE_LIMITER),
+      evmKey: Boolean(c.env.ALCHEMY_API_KEY),
+    },
   }),
 );
 
@@ -149,7 +153,7 @@ async function analyze(
 
   const adapterEnv = {
     HELIUS_API_KEY: env.HELIUS_API_KEY,
-    EVM_RPC_URL: env.EVM_RPC_URL,
+    ALCHEMY_API_KEY: env.ALCHEMY_API_KEY,
     launchCache: launchCacheFrom(env.CACHE),
   };
 

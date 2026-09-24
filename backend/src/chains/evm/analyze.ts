@@ -16,7 +16,7 @@ import { DETECTION, LIMITS } from '../../config.ts';
 import { fetchMarket } from '../../market.ts';
 import { scoreRisk, type FactorInputs } from '../../scoring.ts';
 import { mapWithConcurrency, pctOf, round2 } from '../../util.ts';
-import type { EvmChain } from './chains.ts';
+import type { ResolvedEvmChain } from './chains.ts';
 import { buildEvmHolders, evmHoldingPct, type EvmHolders } from './holders.ts';
 import { locateLaunchBlock, readEvmLaunch, type EvmLaunch } from './launch.ts';
 import { readToken } from './token.ts';
@@ -34,7 +34,7 @@ import type {
 
 export async function analyzeEvmToken(
   client: EvmClient,
-  chain: EvmChain,
+  chain: ResolvedEvmChain,
   chainId: ChainId,
   address: string,
   onPartial?: ((partial: AnalyzeResponse) => void) | undefined,

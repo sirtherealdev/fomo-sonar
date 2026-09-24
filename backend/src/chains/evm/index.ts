@@ -30,7 +30,7 @@
 
 import type { AnalyzeResponse, ChainFamily, ChainId } from '@scope/shared';
 import { ChainNotSupportedError, type AdapterEnv, type ChainAdapter } from '../types.ts';
-import { evmChain } from './chains.ts';
+import { endpointFor, evmChain } from './chains.ts';
 import { EvmClient } from './rpc.ts';
 import { analyzeEvmToken } from './analyze.ts';
 
@@ -52,14 +52,20 @@ export function createEvmAdapter(chain: ChainId): ChainAdapter {
       onPartial?: ((partial: AnalyzeResponse) => void) | undefined,
     ): Promise<AnalyzeResponse> {
       const config = evmChain(chain);
-      // A chain with no endpoint we can reach is not supported yet, and says
-      // so rather than failing halfway through an analysis.
       if (!config) return Promise.reject(new ChainNotSupportedError(chain));
+
+      /*
+       * Without a key, a chain is only supported if its public endpoint can
+       * actually serve an analysis. Better to say "not yet" than to return a
+       * report with its most useful half missing.
+       */
+      const endpoint = endpointFor(config, env.ALCHEMY_API_KEY);
+      if (!endpoint) return Promise.reject(new ChainNotSupportedError(chain));
 
       // A per-request client keeps meta.rpcCalls per analysis rather than
       // cumulative across the Worker's lifetime.
-      const client = new EvmClient(env.EVM_RPC_URL ?? config.rpcUrl, config.requestsPerSecond);
-      return analyzeEvmToken(client, config, chain, address, onPartial);
+      const client = new EvmClient(endpoint.url, endpoint.requestsPerSecond);
+      return analyzeEvmToken(client, endpoint, chain, address, onPartial);
     },
   };
 }

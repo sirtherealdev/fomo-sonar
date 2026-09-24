@@ -100,7 +100,13 @@ export class EvmClient {
           lastError = new EvmError(`${method}: RPC returned ${res.status}`, res.status);
           continue;
         }
-        if (!res.ok) throw new EvmError(`${method}: RPC returned ${res.status}`, res.status);
+        if (!res.ok) {
+          // The body is where providers explain themselves — "range too
+          // large", "not enabled for this app". A bare status code sent me
+          // hunting twice; carrying the reason costs one read.
+          const detail = (await res.text().catch(() => '')).slice(0, 200);
+          throw new EvmError(`${method}: RPC returned ${res.status} ${detail}`, res.status);
+        }
 
         return (await res.json()) as T;
       } catch (err) {
@@ -143,6 +149,12 @@ export class EvmClient {
   async transactionSender(hash: string): Promise<string | null> {
     const tx = await this.rpc<{ from?: string } | null>('eth_getTransactionByHash', [hash]);
     return tx?.from ?? null;
+  }
+
+  /** Timestamp of a block, by number in hex as Alchemy returns it. */
+  async blockTimestampHex(blockHex: string): Promise<number | null> {
+    const b = await this.rpc<EvmBlock | null>('eth_getBlockByNumber', [blockHex, false]);
+    return b ? hexToNumber(b.timestamp) : null;
   }
 
   /** Read-only contract call. `data` is the selector plus encoded arguments. */

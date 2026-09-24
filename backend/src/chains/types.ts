@@ -58,8 +58,8 @@ export interface LaunchCache {
 export interface AdapterEnv {
   /** Solana. Undefined on deployments that do not analyse Solana. */
   HELIUS_API_KEY?: string | undefined;
-  /** EVM chains. */
-  EVM_RPC_URL?: string | undefined;
+  /** EVM chains, all six of them, through one Alchemy key. */
+  ALCHEMY_API_KEY?: string | undefined;
   /** Optional: without it every analysis re-walks history from scratch. */
   launchCache?: LaunchCache | undefined;
 }

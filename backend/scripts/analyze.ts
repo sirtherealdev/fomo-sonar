@@ -40,7 +40,7 @@ async function main(): Promise<void> {
 
   const env = {
     HELIUS_API_KEY: process.env['HELIUS_API_KEY'],
-    EVM_RPC_URL: process.env['EVM_RPC_URL'],
+    ALCHEMY_API_KEY: process.env['ALCHEMY_API_KEY'],
     // Pass --no-cache to force a full re-derivation of the launch.
     launchCache: args.includes('--no-cache') ? undefined : fileLaunchCache,
   };
@@ -53,7 +53,9 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  if (adapter.family === 'svm' && !env.HELIUS_API_KEY) {
+  const missingKey =
+    adapter.family === 'svm' ? !env.HELIUS_API_KEY : false;
+  if (missingKey) {
     console.error('HELIUS_API_KEY is not set. Put it in backend/.dev.vars (see .dev.vars.example).');
     process.exit(1);
   }

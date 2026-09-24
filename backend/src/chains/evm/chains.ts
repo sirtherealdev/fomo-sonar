@@ -1,76 +1,154 @@
 /**
  * Per-chain RPC configuration.
  *
- * These are public endpoints, measured rather than assumed — every limit below
- * came from probing the endpoint directly. They differ enough that the adapter
- * has to respect them individually: Base and BNB cap log queries at 2,000
- * blocks, Monad at 100, and no free public Ethereum endpoint would serve
- * historical logs at all.
+ * Two ways to reach a chain. With an Alchemy key we use `alchemyNetwork`:
+ * archive access, generous log ranges, and — the reason it is not optional —
+ * the endpoint identifies us by key rather than by IP. Public endpoints
+ * throttle Cloudflare's shared egress immediately, so what works from a laptop
+ * returns 429 from a Worker.
  *
- * A chain only appears here once its endpoint has been shown to serve
- * historical data. BNB Chain and Arc are absent for that reason: their public
- * endpoints answer the current state happily and refuse every historical
- * request — state with HTTP 403, logs with the same — so a launch cannot be
- * read there at all. They are one endpoint away from working, not one feature.
- *
- * `holderReplay` says whether reconstructing the full holder set from Transfer
- * logs is realistic here. Where it is false the launch is still readable — a
- * ten-second window is a handful of blocks even on Monad — but concentration
- * is only available for tokens young enough to replay inside the budget.
+ * `publicRpcUrl` is the fallback for local development without a key. Its
+ * limits are measured, not assumed, and they vary sharply: Base allows 2,000
+ * block log queries, Monad 100, and BNB, Arc and Ethereum serve no history at
+ * all. Chains are marked `needsKey` when the public endpoint cannot support a
+ * real analysis.
  */
 
 import type { ChainId } from '@scope/shared';
 
 export interface EvmChain {
   chainId: number;
-  rpcUrl: string;
-  /** Maximum block span accepted by eth_getLogs on this endpoint. */
+  /** Alchemy network id, used when a key is configured. */
+  alchemyNetwork: string;
+  /** Free public endpoint, for local work without a key. */
+  publicRpcUrl: string | null;
+  /** True when the public endpoint cannot serve a usable analysis. */
+  needsKey: boolean;
+  /** Maximum block span accepted by eth_getLogs without a key. */
   maxLogRange: number;
   /**
-   * Seconds per block, measured. Only a starting point — the launch search
-   * measures the real rate at request time, because these drift and a
-   * published figure was once out by a factor of twenty.
+   * Seconds per block. A starting point only — the launch search measures the
+   * real rate per request, because these drift and one published figure was
+   * out by a factor of twenty.
    */
   blockTimeSeconds: number;
-  /** Whether a full holder reconstruction is practical on this endpoint. */
-  holderReplay: boolean;
-  /**
-   * Requests per second this endpoint tolerates.
-   *
-   * Measured, not guessed: publicnode-backed endpoints start answering 403 —
-   * not 429 — somewhere above a few requests a second, which reads as a
-   * permissions error and is really a throttle.
-   */
+  /** Requests per second to send when using the public endpoint. */
   requestsPerSecond: number;
 }
 
 export const EVM_CHAINS: Partial<Record<ChainId, EvmChain>> = {
   base: {
     chainId: 8453,
-    rpcUrl: 'https://mainnet.base.org',
+    alchemyNetwork: 'base-mainnet',
+    publicRpcUrl: 'https://mainnet.base.org',
+    needsKey: false,
     maxLogRange: 2000,
     blockTimeSeconds: 2,
-    holderReplay: true,
     requestsPerSecond: 8,
   },
-  robinhood: {
-    chainId: 4663,
-    rpcUrl: 'https://rpc.mainnet.chain.robinhood.com',
+  bsc: {
+    chainId: 56,
+    alchemyNetwork: 'bnb-mainnet',
+    // Serves current state and refuses every historical request.
+    publicRpcUrl: null,
+    needsKey: true,
     maxLogRange: 2000,
-    blockTimeSeconds: 0.1,
-    holderReplay: true,
-    requestsPerSecond: 5,
+    blockTimeSeconds: 0.75,
+    requestsPerSecond: 3,
+  },
+  ethereum: {
+    chainId: 1,
+    alchemyNetwork: 'eth-mainnet',
+    publicRpcUrl: null,
+    needsKey: true,
+    maxLogRange: 2000,
+    blockTimeSeconds: 12,
+    requestsPerSecond: 3,
   },
   monad: {
     chainId: 143,
-    rpcUrl: 'https://rpc.monad.xyz',
-    // Measured: this endpoint rejects anything wider.
+    alchemyNetwork: 'monad-mainnet',
+    publicRpcUrl: 'https://rpc.monad.xyz',
+    needsKey: false,
     maxLogRange: 100,
     blockTimeSeconds: 0.3,
-    holderReplay: false,
+    requestsPerSecond: 5,
+  },
+  arc: {
+    chainId: 5042,
+    alchemyNetwork: 'arc-mainnet',
+    publicRpcUrl: null,
+    needsKey: true,
+    maxLogRange: 2000,
+    blockTimeSeconds: 1,
+    requestsPerSecond: 3,
+  },
+  robinhood: {
+    chainId: 4663,
+    alchemyNetwork: 'robinhood-mainnet',
+    publicRpcUrl: 'https://rpc.mainnet.chain.robinhood.com',
+    needsKey: false,
+    maxLogRange: 2000,
+    blockTimeSeconds: 0.1,
     requestsPerSecond: 5,
   },
 };
+
+/**
+ * The endpoint to use for a chain, and how hard to push it.
+ *
+ * An Alchemy key raises the log range too: 2,000 blocks is a public-endpoint
+ * limit, not Alchemy's.
+ */
+export interface ResolvedEvmChain {
+  chainId: number;
+  url: string;
+  requestsPerSecond: number;
+  maxLogRange: number;
+  blockTimeSeconds: number;
+  /** Whether rebuilding the whole holder set is realistic here. */
+  holderReplay: boolean;
+  /**
+   * Whether this endpoint offers alchemy_getAssetTransfers.
+   *
+   * Where it does, everything goes through it: eth_getLogs on a free plan
+   * accepts a ten-block range, which cannot cover a launch window, let alone
+   * a token's history.
+   */
+  useAssetTransfers: boolean;
+}
+
+export function endpointFor(
+  chain: EvmChain,
+  alchemyKey: string | undefined,
+): ResolvedEvmChain | null {
+  if (alchemyKey) {
+    return {
+      chainId: chain.chainId,
+      url: `https://${chain.alchemyNetwork}.g.alchemy.com/v2/${alchemyKey}`,
+      // The free plan allows 25/s; staying under it leaves room for retries.
+      requestsPerSecond: 20,
+      // Free-plan eth_getLogs is capped at ten blocks; we use the transfers
+      // API instead, so this only matters as a fallback.
+      maxLogRange: 10,
+      blockTimeSeconds: chain.blockTimeSeconds,
+      holderReplay: true,
+      useAssetTransfers: true,
+    };
+  }
+
+  if (!chain.publicRpcUrl || chain.needsKey) return null;
+  return {
+    chainId: chain.chainId,
+    url: chain.publicRpcUrl,
+    requestsPerSecond: chain.requestsPerSecond,
+    maxLogRange: chain.maxLogRange,
+    blockTimeSeconds: chain.blockTimeSeconds,
+    // A hundred blocks a query cannot rebuild a holder set of any size.
+    holderReplay: chain.maxLogRange >= 1000,
+    useAssetTransfers: false,
+  };
+}
 
 export function evmChain(chain: ChainId): EvmChain | undefined {
   return EVM_CHAINS[chain];
