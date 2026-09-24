@@ -88,9 +88,23 @@ data about that token.
 
 ---
 
+## Screenshots
+
+Three, 1280x800, in `store/screenshots/`. Each shows a different thing the
+panel is for, rather than three views of the same report:
+
+| file | shows |
+| --- | --- |
+| `risky.png` | a bundled launch — the signals, the funding clusters behind them, and a seizure delegate |
+| `clean.png` | concentration with pools excluded, and a launch with nothing to flag |
+| `unknown.png` | a token whose launch cannot be read, reported as unknown rather than as safe |
+
+They use illustrative token data, not a verdict on any real token. Regenerate
+with `extension/.preview/shot.html` after the visual design lands.
+
 ## Assets still needed
 
 - [ ] Final icon set (16, 32, 48, 128 px) — placeholders in `extension/public/icon`
-- [ ] Screenshots, 1280x800 or 640x400, at least one, up to five
+- [ ] Screenshots reshot on the final design
 - [ ] Optional promotional tile, 440x280
 - [ ] Privacy policy hosted at a public URL — text in `store/PRIVACY.md`
