@@ -30,7 +30,7 @@ import type {
   SecurityInfo,
   TokenInfo,
   Unavailable,
-} from '@scope/shared';
+} from '@sonar/shared';
 
 export async function analyzeEvmToken(
   client: EvmClient,

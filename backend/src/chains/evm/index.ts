@@ -28,7 +28,7 @@
  * means tracing internal calls.
  */
 
-import type { AnalyzeResponse, ChainFamily, ChainId } from '@scope/shared';
+import type { AnalyzeResponse, ChainFamily, ChainId } from '@sonar/shared';
 import { ChainNotSupportedError, type AdapterEnv, type ChainAdapter } from '../types.ts';
 import { endpointFor, evmChain } from './chains.ts';
 import { EvmClient } from './rpc.ts';

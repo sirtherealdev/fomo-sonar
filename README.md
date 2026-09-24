@@ -1,4 +1,4 @@
-# SCOPE Scanner
+# SONAR
 
 Read-only token risk overlay for [Fomo Web](https://fomo.family).
 
@@ -127,8 +127,8 @@ issued the URL fails the handshake rather than returning an error.
 Then point the extension at it and rebuild:
 
 ```bash
-echo 'WXT_API_BASE=https://scope-scanner-api.YOUR-SUBDOMAIN.workers.dev' > extension/.env
-npm run build -w @scope/extension
+echo 'WXT_API_BASE=https://sonar-api.YOUR-SUBDOMAIN.workers.dev' > extension/.env
+npm run build -w @sonar/extension
 ```
 
 Reload the unpacked extension at `chrome://extensions` afterwards.
@@ -148,7 +148,7 @@ correct — there is nobody else on localhost.
 ```bash
 npm run build:ext               # build pointed at the local Worker
 npm run dev:ext                 # hot reload, but in a fresh Chrome profile
-npm test -w @scope/extension    # address/chain detection tests
+npm test -w @sonar/extension    # address/chain detection tests
 ```
 
 To try it against a real Fomo page you need to be logged in, so load it into
@@ -157,7 +157,7 @@ run `npm run dev:api`, then `npm run build:ext`, then load
 `extension/.output/chrome-mv3` at `chrome://extensions` with Developer mode on.
 
 `build:ext` points the extension at `http://localhost:8787`. A plain
-`npm run build -w @scope/extension` points it at the deployed Worker.
+`npm run build -w @sonar/extension` points it at the deployed Worker.
 
 The panel lives in a **closed** shadow root: Fomo's CSS cannot reach in, ours
 cannot leak out, and the host page can neither read nor restyle it. It is
@@ -216,7 +216,7 @@ listing copy, permission justifications and the privacy policy. Build the
 package with:
 
 ```bash
-npm run build -w @scope/extension   # uses extension/.env for WXT_API_BASE
+npm run build -w @sonar/extension   # uses extension/.env for WXT_API_BASE
 npx wxt zip -c extension
 ```
 

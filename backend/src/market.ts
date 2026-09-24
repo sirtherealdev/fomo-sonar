@@ -11,7 +11,7 @@
  * counts, which is the whole headline strip.
  */
 
-import type { ChainId, MarketInfo, TokenInfo } from '@scope/shared';
+import type { ChainId, MarketInfo, TokenInfo } from '@sonar/shared';
 
 const TOKENS_URL = 'https://api.dexscreener.com/latest/dex/tokens';
 const ORDERS_URL = 'https://api.dexscreener.com/orders/v1';

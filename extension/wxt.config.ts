@@ -16,7 +16,10 @@ import { defineConfig } from 'wxt';
  */
 export default defineConfig({
   manifest: {
-    name: 'SCOPE Scanner',
+    // The Store listing takes its title from here. 'for Fomo' rather than
+    // 'Fomo' on purpose: it states the relationship without implying that
+    // Fomo published it, which is what store review looks for.
+    name: 'SONAR — Risk Scanner for Fomo',
     description: 'Read-only token risk overlay for Fomo Web. Reads the token address, nothing else.',
     permissions: ['storage'],
     // Placeholder marks from public/icon — replace before submitting.

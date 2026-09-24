@@ -86,7 +86,7 @@ export class EvmClient {
              * as a permissions failure and cost an afternoon to find. Naming
              * ourselves is also the polite thing to do on a free endpoint.
              */
-            'user-agent': 'scope-scanner/0.1 (+https://github.com/scope-scanner)',
+            'user-agent': 'fomo-sonar/0.1 (+https://github.com/fomo-sonar)',
           },
           body,
         });

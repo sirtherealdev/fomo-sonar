@@ -3,7 +3,7 @@
  *
  * Set WXT_API_BASE in extension/.env to point a build at your deployment:
  *
- *   WXT_API_BASE=https://scope-scanner-api.you.workers.dev
+ *   WXT_API_BASE=https://sonar-api.you.workers.dev
  *
  * Without it, a development build talks to the local Worker and a production
  * build has nowhere to go — which is deliberate. A wrong URL baked into a

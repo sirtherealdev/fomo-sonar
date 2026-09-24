@@ -1,5 +1,5 @@
 {
-  "name": "@scope/backend",
+  "name": "@sonar/backend",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "analyze": "node --import tsx --env-file-if-exists=.dev.vars scripts/analyze.ts"
   },
   "dependencies": {
-    "@scope/shared": "*",
+    "@sonar/shared": "*",
     "hono": "^4.6.14"
   },
   "devDependencies": {

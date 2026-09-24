@@ -7,7 +7,7 @@ on the visual design.
 
 ## Name
 
-SCOPE Scanner
+SONAR
 
 ## Short description (132 characters max)
 
@@ -20,7 +20,7 @@ Developer Tools
 
 ## Detailed description
 
-SCOPE Scanner adds a risk panel to token pages on Fomo Web. It answers the
+SONAR adds a risk panel to token pages on Fomo Web. It answers the
 question you actually have before you buy: who got in first, who is still
 holding, and can anyone change the rules after you do.
 
