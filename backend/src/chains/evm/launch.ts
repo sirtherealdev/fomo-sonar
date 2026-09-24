@@ -13,9 +13,10 @@
  */
 
 import { DETECTION, LIMITS } from '../../config.ts';
-import type { EvmChain } from './chains.ts';
+import type { ResolvedEvmChain } from './chains.ts';
 import { hexToBigInt, hexToNumber, topicToAddress, ZERO_ADDRESS } from './helpers.ts';
 import type { EvmClient, EvmLog } from './rpc.ts';
+import { assetTransfers, firstTransfer, type AssetTransfer } from './transfers.ts';
 
 /** keccak256("Transfer(address,address,uint256)") */
 export const TRANSFER_TOPIC =
@@ -55,10 +56,20 @@ export interface EvmLaunch {
  */
 export async function locateLaunchBlock(
   client: EvmClient,
-  chain: EvmChain,
+  chain: ResolvedEvmChain,
   token: string,
   hintTimestamp: number | null,
 ): Promise<number | null> {
+  /*
+   * With the transfers API this is one call: a token's first transfer is its
+   * mint, and the results come back in chain order. No binary search, no
+   * historical state, no timestamp hint to be wrong about.
+   */
+  if (chain.useAssetTransfers) {
+    const first = await firstTransfer(client, token);
+    return first ? hexToNumber(first.blockNum) : null;
+  }
+
   try {
     return await findDeploymentBlock(client, chain, token, hintTimestamp);
   } catch (err) {
@@ -88,7 +99,7 @@ export async function locateLaunchBlock(
  */
 async function findMintByLogs(
   client: EvmClient,
-  chain: EvmChain,
+  chain: ResolvedEvmChain,
   token: string,
   timestamp: number,
 ): Promise<number | null> {
@@ -141,7 +152,7 @@ async function findMintByLogs(
  */
 export async function findDeploymentBlock(
   client: EvmClient,
-  chain: EvmChain,
+  chain: ResolvedEvmChain,
   token: string,
   hintTimestamp: number | null,
 ): Promise<number | null> {
@@ -191,24 +202,26 @@ export async function findDeploymentBlock(
  */
 export async function readEvmLaunch(
   client: EvmClient,
-  chain: EvmChain,
+  chain: ResolvedEvmChain,
   token: string,
   deploymentBlock: number,
   decimals: number,
 ): Promise<EvmLaunch | null> {
   const windowBlocks = Math.ceil(DETECTION.sniperWindowSeconds / chain.blockTimeSeconds);
-  const span = Math.min(Math.max(windowBlocks, DETECTION.bundleBlockWindow + 1), chain.maxLogRange);
+  const span = Math.max(windowBlocks, DETECTION.bundleBlockWindow + 1);
 
-  const logs = await client.logs(token, TRANSFER_TOPIC, deploymentBlock, deploymentBlock + span);
-  if (logs.length === 0) return null;
+  const moves = chain.useAssetTransfers
+    ? await windowFromTransfers(client, token, deploymentBlock, span)
+    : await windowFromLogs(client, chain, token, deploymentBlock, span);
 
-  // The mint is the first transfer out of the zero address.
-  const mint = logs.find((log) => topicToAddress(log.topics[1] ?? '') === ZERO_ADDRESS);
+  if (moves.length === 0) return null;
+
+  const mint = moves.find((m) => m.from === ZERO_ADDRESS);
   if (!mint) return null;
 
-  const mintBlock = hexToNumber(mint.blockNumber);
+  const mintBlock = mint.block;
   const mintTime = (await client.blockTimestamp(mintBlock)) ?? 0;
-  const dev = (await client.transactionSender(mint.transactionHash))?.toLowerCase() ?? null;
+  const dev = (await client.transactionSender(mint.txHash))?.toLowerCase() ?? null;
   if (!dev) return null;
 
   const scale = 10 ** decimals;
@@ -218,13 +231,11 @@ export async function readEvmLaunch(
   let devInitialUiAmount = 0;
 
   const maxBundleBlock = mintBlock + DETECTION.bundleBlockWindow;
-  const truncated = logs.length > LIMITS.maxEarlyTransactions;
+  const truncated = moves.length > LIMITS.maxEarlyTransactions;
 
-  for (const log of logs.slice(0, LIMITS.maxEarlyTransactions)) {
-    const from = topicToAddress(log.topics[1] ?? '');
-    const to = topicToAddress(log.topics[2] ?? '');
-    const amount = Number(hexToBigInt(log.data)) / scale;
-    const block = hexToNumber(log.blockNumber);
+  for (const move of moves.slice(0, LIMITS.maxEarlyTransactions)) {
+    const { from, to, block } = move;
+    const amount = move.rawAmount !== null ? Number(move.rawAmount) / scale : (move.uiAmount ?? 0);
 
     // Net, not gross: tokens cycle between wallets during a launch, and
     // counting every inbound transfer lets a set of wallets appear to have
@@ -263,7 +274,7 @@ export async function readEvmLaunch(
   }
 
   return {
-    txHash: mint.transactionHash,
+    txHash: mint.txHash,
     block: mintBlock,
     timestamp: mintTime,
     dev,
@@ -273,6 +284,68 @@ export async function readEvmLaunch(
     bought,
     truncated,
   };
+}
+
+/** One token movement, however we read it. */
+interface Move {
+  from: string;
+  to: string;
+  block: number;
+  txHash: string;
+  /** Raw base units when we have them. */
+  rawAmount: bigint | null;
+  /** Decimal-adjusted, when that is all the source gives. */
+  uiAmount: number | null;
+}
+
+function toMove(t: AssetTransfer): Move {
+  return {
+    from: t.from.toLowerCase(),
+    to: (t.to ?? ZERO_ADDRESS).toLowerCase(),
+    block: hexToNumber(t.blockNum),
+    txHash: t.hash,
+    rawAmount: t.rawContract.value ? hexToBigInt(t.rawContract.value) : null,
+    uiAmount: t.value,
+  };
+}
+
+async function windowFromTransfers(
+  client: EvmClient,
+  token: string,
+  fromBlock: number,
+  span: number,
+): Promise<Move[]> {
+  const { transfers } = await assetTransfers(client, token, {
+    fromBlock: `0x${fromBlock.toString(16)}`,
+    maxPages: 1,
+    pageSize: LIMITS.maxEarlyTransactions,
+  });
+
+  return transfers.map(toMove).filter((m) => m.block <= fromBlock + span);
+}
+
+async function windowFromLogs(
+  client: EvmClient,
+  chain: ResolvedEvmChain,
+  token: string,
+  fromBlock: number,
+  span: number,
+): Promise<Move[]> {
+  const logs = await client.logs(
+    token,
+    TRANSFER_TOPIC,
+    fromBlock,
+    fromBlock + Math.min(span, chain.maxLogRange),
+  );
+
+  return logs.map((log) => ({
+    from: topicToAddress(log.topics[1] ?? ''),
+    to: topicToAddress(log.topics[2] ?? ''),
+    block: hexToNumber(log.blockNumber),
+    txHash: log.transactionHash,
+    rawAmount: hexToBigInt(log.data),
+    uiAmount: null,
+  }));
 }
 
 /** Remove every address in the set that has bytecode, in place. */
@@ -286,7 +359,7 @@ async function removeContracts(client: EvmClient, wallets: Set<string>): Promise
 /** Transfer logs between two blocks, respecting this endpoint's range limit. */
 export async function transfersInRange(
   client: EvmClient,
-  chain: EvmChain,
+  chain: ResolvedEvmChain,
   token: string,
   fromBlock: number,
   toBlock: number,

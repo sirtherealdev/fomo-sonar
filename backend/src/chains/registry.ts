@@ -33,13 +33,15 @@ export function supportedChains(): ChainId[] {
 }
 
 /**
- * Chains we can actually analyse right now.
+ * Chains we can actually analyse, which depends on what is configured.
  *
- * Ethereum, BNB Chain and Arc are deliberately absent. The EVM adapter runs
- * them fine; their free public endpoints will not serve historical state or
- * logs, and a launch cannot be read without one of those. A clear "not yet"
- * beats a report with its most useful half missing.
+ * With an Alchemy key, every EVM chain works. Without one, only those whose
+ * free public endpoint serves history: BNB Chain, Arc and Ethereum will not,
+ * and a launch cannot be read without it. A clear "not yet" beats a report
+ * with its most useful half missing.
  */
-export function implementedChains(): ChainId[] {
-  return ['solana', 'base', 'monad', 'robinhood'];
+export function implementedChains(hasEvmKey: boolean): ChainId[] {
+  return hasEvmKey
+    ? ['solana', 'base', 'bsc', 'ethereum', 'monad', 'arc', 'robinhood']
+    : ['solana', 'base', 'monad', 'robinhood'];
 }

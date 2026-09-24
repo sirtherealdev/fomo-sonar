@@ -14,9 +14,10 @@
 
 import { DETECTION, LIMITS } from '../../config.ts';
 import { pctOf } from '../../util.ts';
-import type { EvmChain } from './chains.ts';
+import type { ResolvedEvmChain } from './chains.ts';
 import { hexToBigInt, hexToNumber, topicToAddress, ZERO_ADDRESS } from './helpers.ts';
 import { transfersInRange } from './launch.ts';
+import { assetTransfers } from './transfers.ts';
 import type { EvmClient } from './rpc.ts';
 import type { ExcludedAccount, HolderEntry } from '@scope/shared';
 
@@ -35,21 +36,11 @@ const BURN_ADDRESSES = new Set([ZERO_ADDRESS, '0x0000000000000000000000000000000
 
 export async function buildEvmHolders(
   client: EvmClient,
-  chain: EvmChain,
+  chain: ResolvedEvmChain,
   token: string,
   fromBlock: number,
   supply: bigint,
 ): Promise<EvmHolders> {
-  const latest = await client.blockNumber();
-  const { logs, complete } = await transfersInRange(
-    client,
-    chain,
-    token,
-    fromBlock,
-    latest,
-    LIMITS.evmMaxLogQueries,
-  );
-
   const balances = new Map<string, bigint>();
   const add = (address: string, delta: bigint): void => {
     const next = (balances.get(address) ?? 0n) + delta;
@@ -57,14 +48,50 @@ export async function buildEvmHolders(
     else balances.set(address, next);
   };
 
-  for (const log of logs) {
-    const from = topicToAddress(log.topics[1] ?? '');
-    const to = topicToAddress(log.topics[2] ?? '');
-    const amount = hexToBigInt(log.data);
-    if (amount === 0n) continue;
+  /*
+   * Two ways to read the same history. The transfers API pages through the
+   * whole thing; eth_getLogs is the fallback for endpoints without it, and its
+   * block-range limit is what bounds how far back we can see there.
+   */
+  let complete: boolean;
 
-    if (from !== ZERO_ADDRESS) add(from, -amount);
-    if (to !== ZERO_ADDRESS) add(to, amount);
+  if (chain.useAssetTransfers) {
+    const result = await assetTransfers(client, token, {
+      fromBlock: `0x${fromBlock.toString(16)}`,
+      maxPages: LIMITS.evmMaxTransferPages,
+    });
+    complete = result.complete;
+
+    for (const t of result.transfers) {
+      const raw = t.rawContract.value ? hexToBigInt(t.rawContract.value) : 0n;
+      if (raw === 0n) continue;
+      const from = t.from.toLowerCase();
+      const to = (t.to ?? ZERO_ADDRESS).toLowerCase();
+
+      if (from !== ZERO_ADDRESS) add(from, -raw);
+      if (to !== ZERO_ADDRESS) add(to, raw);
+    }
+  } else {
+    const latest = await client.blockNumber();
+    const result = await transfersInRange(
+      client,
+      chain,
+      token,
+      fromBlock,
+      latest,
+      LIMITS.evmMaxLogQueries,
+    );
+    complete = result.complete;
+
+    for (const log of result.logs) {
+      const from = topicToAddress(log.topics[1] ?? '');
+      const to = topicToAddress(log.topics[2] ?? '');
+      const amount = hexToBigInt(log.data);
+      if (amount === 0n) continue;
+
+      if (from !== ZERO_ADDRESS) add(from, -amount);
+      if (to !== ZERO_ADDRESS) add(to, amount);
+    }
   }
 
   // Burn addresses are excluded outright: nobody holds those tokens.

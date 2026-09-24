@@ -261,6 +261,13 @@ export const LIMITS = {
   evmMaxLogQueries: 60,
 
   /**
+   * Pages of 1,000 transfers when rebuilding an EVM holder set through
+   * Alchemy. Past this the holder set is reported as partial — 60,000
+   * transfers is a large memecoin's entire life and a blue chip's afternoon.
+   */
+  evmMaxTransferPages: 60,
+
+  /**
    * Rounds of widening when searching for a launch by logs, used on the
    * endpoints that cannot answer historical state. Each round scans one
    * maximum-range window either side of the estimate.
