@@ -209,6 +209,25 @@ Two implementation notes that are load-bearing for the trust story:
   are best guesses in `CHAIN_ALIASES` until someone opens a token page on
   those chains.
 
+## Publishing
+
+Everything that does not depend on the visual design is in [`store/`](store):
+listing copy, permission justifications and the privacy policy. Build the
+package with:
+
+```bash
+npm run build -w @scope/extension   # uses extension/.env for WXT_API_BASE
+npx wxt zip -c extension
+```
+
+Chrome has no route around the Web Store: inline installation was removed in
+2018, and a `.crx` served from your own site is refused. An **unlisted** listing
+is the closest thing — reviewed like any other, but absent from search, so the
+only way in is a link you hand out.
+
+The icons in `extension/public/icon` are placeholders and say so. Screenshots
+are the other thing still waiting on the design.
+
 ## How the detection works
 
 Each detector is one file in `backend/src/analysis/`, commented in place.

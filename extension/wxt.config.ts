@@ -19,5 +19,12 @@ export default defineConfig({
     name: 'SCOPE Scanner',
     description: 'Read-only token risk overlay for Fomo Web. Reads the token address, nothing else.',
     permissions: ['storage'],
+    // Placeholder marks from public/icon — replace before submitting.
+    icons: {
+      16: '/icon/16.png',
+      32: '/icon/32.png',
+      48: '/icon/48.png',
+      128: '/icon/128.png',
+    },
   },
 });
