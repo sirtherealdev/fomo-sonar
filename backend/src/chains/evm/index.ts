@@ -1,9 +1,9 @@
 /**
  * EVM adapter — Base, BNB Chain, Ethereum, Monad.
  *
- * Not implemented yet. This file exists so the shape of the work is explicit
- * rather than hidden in a ticket, and so adding a chain is a registry entry
- * instead of a refactor.
+ * Implemented for the chains in chains.ts that have a usable public endpoint.
+ * Ethereum is absent: no free public node would serve the historical logs
+ * this needs, so it reports as unsupported rather than as an empty report.
  *
  * What each signal maps to on EVM:
  *
@@ -21,11 +21,18 @@
  *                    function, instead of mint/freeze authorities
  *
  * The one genuinely harder part than Solana is the holder set: it has to be
- * reconstructed from logs or bought from an indexer.
+ * reconstructed from logs, which bounds how far back we can see.
+ *
+ * Insiders and funding clusters are not implemented. Both need a wallet's
+ * first funding source, which on Solana is one signature lookup and on EVM
+ * means tracing internal calls.
  */
 
-import type { ChainFamily, ChainId } from '@scope/shared';
+import type { AnalyzeResponse, ChainFamily, ChainId } from '@scope/shared';
 import { ChainNotSupportedError, type AdapterEnv, type ChainAdapter } from '../types.ts';
+import { evmChain } from './chains.ts';
+import { EvmClient } from './rpc.ts';
+import { analyzeEvmToken } from './analyze.ts';
 
 /** 20 bytes of hex. Checksum is not validated: we only ever read, never send. */
 const EVM_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
@@ -39,8 +46,20 @@ export function createEvmAdapter(chain: ChainId): ChainAdapter {
       return EVM_ADDRESS.test(address);
     },
 
-    analyze(_address: string, _env: AdapterEnv): Promise<never> {
-      return Promise.reject(new ChainNotSupportedError(chain));
+    analyze(
+      address: string,
+      env: AdapterEnv,
+      onPartial?: ((partial: AnalyzeResponse) => void) | undefined,
+    ): Promise<AnalyzeResponse> {
+      const config = evmChain(chain);
+      // A chain with no endpoint we can reach is not supported yet, and says
+      // so rather than failing halfway through an analysis.
+      if (!config) return Promise.reject(new ChainNotSupportedError(chain));
+
+      // A per-request client keeps meta.rpcCalls per analysis rather than
+      // cumulative across the Worker's lifetime.
+      const client = new EvmClient(env.EVM_RPC_URL ?? config.rpcUrl, config.requestsPerSecond);
+      return analyzeEvmToken(client, config, chain, address, onPartial);
     },
   };
 }
