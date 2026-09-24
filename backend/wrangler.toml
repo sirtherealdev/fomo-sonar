@@ -11,13 +11,12 @@ compatibility_flags = ["nodejs_compat"]
 #   analyze:*  per-token responses, TTL from config.ts (CACHE.ttlSeconds)
 #   launch:*   launch facts, stored permanently — see chains/types.ts
 #
-# `wrangler dev` ignores the id and keeps this in .wrangler/state locally, so
-# the binding works out of the box. Before deploying, create a real namespace
-# and paste its id here:
-#   npx wrangler kv namespace create CACHE
+# `wrangler dev` ignores this id and keeps state in .wrangler/state locally.
+# In production it is load-bearing: a wrong id silently caches nothing, so
+# every analysis would pay full price and no launch would ever be preserved.
 [[kv_namespaces]]
 binding = "CACHE"
-id = "local-dev-placeholder"
+id = "074625f13f6d4352a16b00e3ade59a55"
 
 # Per-IP rate limiting. This endpoint fronts our Helius key, so an unlimited
 # public URL is an unlimited bill. 30 requests a minute is far more than a

@@ -89,6 +89,21 @@ npx wrangler secret put HELIUS_API_KEY   # paste the key when prompted
 npx wrangler deploy                      # prints the live URL
 ```
 
+A fresh Cloudflare account has no `workers.dev` subdomain, and `wrangler
+deploy` can only offer to create one through an interactive prompt. If that
+prompt is awkward to answer, register it over the API instead — the name is
+account-wide, so pick something that suits future projects too:
+
+```bash
+TOKEN=$(grep -m1 oauth_token ~/Library/Preferences/.wrangler/config/default.toml | cut -d'"' -f2)
+curl -X PUT -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  --data '{"subdomain":"your-name"}' \
+  "https://api.cloudflare.com/client/v4/accounts/<account-id>/workers/subdomain"
+```
+
+The TLS certificate for a new subdomain takes a few minutes; until it is
+issued the URL fails the handshake rather than returning an error.
+
 Then point the extension at it and rebuild:
 
 ```bash
