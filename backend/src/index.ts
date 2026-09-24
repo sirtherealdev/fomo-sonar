@@ -89,7 +89,15 @@ app.use('/analyze/*', async (c, next) => {
 });
 
 app.get('/health', (c) =>
-  c.json({ ok: true, chains: supportedChains(), implemented: implementedChains() }),
+  c.json({
+    ok: true,
+    chains: supportedChains(),
+    implemented: implementedChains(),
+    // Which optional bindings this deployment actually has. Both are silent
+    // when missing — no cache just means slow, no limiter means unprotected —
+    // so they need to be visible somewhere.
+    bindings: { cache: Boolean(c.env.CACHE), rateLimiter: Boolean(c.env.RATE_LIMITER) },
+  }),
 );
 
 app.get('/analyze/:chain/:address', (c) => analyze(c.env, c.executionCtx, c.req.param('chain'), c.req.param('address')));
