@@ -261,11 +261,15 @@ export const LIMITS = {
   evmMaxLogQueries: 60,
 
   /**
-   * Pages of 1,000 transfers when rebuilding an EVM holder set through
-   * Alchemy. Past this the holder set is reported as partial — 60,000
-   * transfers is a large memecoin's entire life and a blue chip's afternoon.
+   * Pages of 1,000 transfers when rebuilding an EVM holder set through Alchemy.
+   *
+   * 25,000 transfers covers a new memecoin's entire life several times over,
+   * which is what a launchpad trades. A three-year-old token has millions and
+   * will never complete at any budget — 60 pages took a minute and still did
+   * not finish, so the budget is set for the common case and the report says
+   * when it was not enough.
    */
-  evmMaxTransferPages: 60,
+  evmMaxTransferPages: 25,
 
   /**
    * Rounds of widening when searching for a launch by logs, used on the
