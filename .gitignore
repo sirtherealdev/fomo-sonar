@@ -14,3 +14,4 @@ dist/
 .launch-cache.json
 
 .env
+website/assets/

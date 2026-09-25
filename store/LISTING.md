@@ -54,11 +54,20 @@ zero — a token whose launch is unreadable is reported as unknown, not as safe.
 
 The source is public. The permission list is three lines, and you can read it.
 
-**Supported chains**
-
-Solana, Base, BNB Chain, Ethereum, Monad, Arc and Robinhood Chain.
+It works on every chain Fomo Web supports.
 
 ---
+
+## Do not list the chains by name
+
+The first submission was rejected under "Spam and Placement in the Store" for
+excessive keywords, quoting exactly this line:
+
+> Solana, Base, BNB Chain, Ethereum, Monad, Arc and Robinhood Chain.
+
+Seven brand names in a row reads as keyword stuffing to the automated check,
+however factual it is. The description says "every chain Fomo Web supports"
+instead. Name the chains on the website, not in the listing.
 
 ## Permission justifications
 

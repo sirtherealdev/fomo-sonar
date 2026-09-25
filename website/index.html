@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SONAR — see who is really holding a token</title>
+<meta name="description" content="A read-only risk panel for Fomo Web token pages. Bundlers, snipers, the dev wallet and holder concentration, read from the launch itself.">
+<link rel="icon" href="assets/icon.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+  <div class="shell bar">
+    <a class="mark" href="#top"><img src="assets/icon.png" alt=""><span>SONAR</span></a>
+    <nav>
+      <a href="#signals">Signals</a>
+      <a href="#unknown">When it can't tell</a>
+      <a href="#permissions">Permissions</a>
+      <a href="https://github.com/sirtherealdev/fomo-sonar">Source</a>
+    </nav>
+  </div>
+</header>
+
+<div class="ticker">
+  <div class="shell">
+    <div class="ticker-row" id="ticker"></div>
+  </div>
+</div>
+
+<main id="top">
+
+  <div class="hero shell">
+    <div class="hero-grid">
+      <div>
+        <p class="label"><span class="on">●</span> Read-only · seven chains · open source</p>
+        <h1>Eleven wallets bought in the <em>same block</em>. The chart won't mention it.</h1>
+        <p class="lede">
+          SONAR reads a token's launch and shows you who was already there before
+          you arrived — bundlers, snipers, the dev wallet, and who is still holding.
+        </p>
+        <div class="cta-row">
+          <span class="btn btn-pending">◷ In review · Chrome Web Store</span>
+          <a class="btn btn-ghost" href="https://github.com/sirtherealdev/fomo-sonar">Read the source →</a>
+        </div>
+        <p class="hero-note">Free. No account. Never touches your wallet.</p>
+      </div>
+
+      <div>
+        <div class="sonar-wrap">
+          <div class="sonar" id="sonar">
+            <div class="ring" style="width:26%;height:26%"></div>
+            <div class="ring" style="width:52%;height:52%"></div>
+            <div class="ring" style="width:78%;height:78%"></div>
+            <div class="cross h"></div>
+            <div class="cross v"></div>
+            <div class="sweep"></div>
+          </div>
+          <div class="sonar-caption">
+            <span>scanning launch window</span>
+            <span class="hit">6 wallets · same block</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section id="signals">
+    <div class="shell">
+      <p class="label">The signals</p>
+      <h2>Six things a price chart cannot tell you.</h2>
+      <p class="section-lede">
+        Every number here comes from the chain — the launch transaction itself and
+        everything that moved in the seconds after it.
+      </p>
+
+      <div class="cards">
+        <div class="card">
+          <p class="n">01</p>
+          <h3>Bundlers</h3>
+          <p>
+            Wallets that bought in the same block or slot as the launch. That is
+            machine timing, not people reacting. Shown as both what they took and
+            what they still hold — a bundler that already dumped is evidence of a
+            bundled launch, not of a clean one.
+          </p>
+        </div>
+        <div class="card">
+          <p class="n">02</p>
+          <h3>Funding clusters</h3>
+          <p>
+            When one address paid for a dozen wallets that all bought at the same
+            instant. The clearest bundling signal there is, and nothing else on the
+            page will show it to you.
+          </p>
+        </div>
+        <div class="card">
+          <p class="n">03</p>
+          <h3>Dev wallet</h3>
+          <p>
+            What the creator holds now, and how much of its initial allocation has
+            already left the wallet.
+          </p>
+        </div>
+        <div class="card">
+          <p class="n">04</p>
+          <h3>Snipers</h3>
+          <p>
+            Buyers inside the first seconds, counted apart from bundlers so one
+            wallet is never held against a token twice.
+          </p>
+        </div>
+        <div class="card">
+          <p class="n">05</p>
+          <h3>Real concentration</h3>
+          <p>
+            The top ten wallets with liquidity pools, burn addresses and program
+            accounts removed. Counting a pool as a holder makes every healthy token
+            look rugged.
+          </p>
+        </div>
+        <div class="card">
+          <p class="n">06</p>
+          <h3>Token controls</h3>
+          <p>
+            Whether anyone can still mint new supply, freeze your balance, take
+            tokens out of any wallet, or change the transfer tax.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="unknown">
+    <div class="shell split flip">
+      <div class="shot">
+        <img src="assets/panel-unknown.png" alt="The panel reporting a token as unknown because its launch could not be read">
+      </div>
+      <div>
+        <p class="label">When it can't tell</p>
+        <h2>It says <em style="font-style:normal;color:var(--amber)">unknown</em> instead of guessing.</h2>
+        <p>
+          Some tokens have traded so heavily that their launch is no longer
+          readable. Most tools quietly return zero for whatever they could not
+          check — and a row of zeroes looks exactly like a clean token.
+        </p>
+        <p>
+          SONAR refuses to. When it cannot measure enough to have an opinion it
+          withholds the score entirely, because a green number nobody earned is
+          worse than no number at all.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section id="permissions">
+    <div class="shell split">
+      <div>
+        <p class="label">Permissions</p>
+        <h2>It runs where your wallet is. So it does almost nothing.</h2>
+        <p>
+          The entire permission list is three lines and you can read all of it.
+          No <code>tabs</code>, no <code>cookies</code>, no <code>webRequest</code>,
+          no access to any site but Fomo.
+        </p>
+        <ul class="checklist">
+          <li><span class="no">✕</span> Never touches your wallet or signs anything</li>
+          <li><span class="no">✕</span> Never reads cookies, storage or session data</li>
+          <li><span class="no">✕</span> Never clicks, types or submits on the page</li>
+          <li><span class="no">✕</span> No analytics, no tracking, no remote code</li>
+        </ul>
+      </div>
+      <div>
+        <div class="code"><span class="k">"permissions"</span>: [<span class="s">"storage"</span>],
+<span class="k">"content_scripts"</span>: [{
+  <span class="k">"matches"</span>: [<span class="s">"https://fomo.family/*"</span>]
+}]</div>
+        <p style="margin-top:16px;font-size:13.5px;color:var(--text-faint);font-family:var(--mono);line-height:1.7">
+          The whole of it. <span style="color:var(--text-dim)">storage</span> remembers
+          where you dragged the panel; nothing else is kept, and nothing leaves your
+          browser except the token's address.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="shell">
+      <p class="label">Coverage</p>
+      <h2>Every chain Fomo supports.</h2>
+      <p class="section-lede">
+        The same panel and the same numbers, read natively on each — not one chain
+        with the rest bolted on.
+      </p>
+      <div class="chains">
+        <span class="chip">Solana</span><span class="chip">Base</span>
+        <span class="chip">BNB Chain</span><span class="chip">Ethereum</span>
+        <span class="chip">Monad</span><span class="chip">Arc</span>
+        <span class="chip">Robinhood Chain</span>
+      </div>
+      <div class="cta-row" style="margin-top:38px">
+        <span class="btn btn-pending">◷ In review · Chrome Web Store</span>
+        <a class="btn btn-ghost" href="https://github.com/sirtherealdev/fomo-sonar">Read the source →</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="shell foot">
+    <span style="font-weight:600;letter-spacing:.16em;font-size:13px">SONAR</span>
+    <a href="https://github.com/sirtherealdev/fomo-sonar">GitHub</a>
+    <a href="https://github.com/sirtherealdev/fomo-sonar/blob/main/store/PRIVACY.md">Privacy</a>
+    <span class="spacer">Not affiliated with Fomo</span>
+  </div>
+</footer>
+
+<script>
+/*
+ * The blips are generated rather than hand-placed so the cluster can be timed
+ * to the sweep: each blip lights when the beam reaches its angle, and the six
+ * cluster blips share one angle, so they fire together — which is the whole
+ * point being made.
+ */
+(function () {
+  const sonar = document.getElementById('sonar');
+  const PERIOD = 5;
+  const place = (angleDeg, radiusPct, isCluster) => {
+    const rad = (angleDeg - 90) * Math.PI / 180;
+    const b = document.createElement('div');
+    b.className = 'blip' + (isCluster ? ' cluster' : '');
+    b.style.left = (50 + Math.cos(rad) * radiusPct) + '%';
+    b.style.top = (50 + Math.sin(rad) * radiusPct) + '%';
+    b.style.animationDelay = (-(PERIOD * (1 - angleDeg / 360))).toFixed(2) + 's';
+    sonar.appendChild(b);
+  };
+
+  const scattered = [
+    [18, 31], [47, 12], [72, 38], [96, 22], [118, 44], [143, 17],
+    [167, 36], [198, 27], [214, 41], [246, 14], [268, 33], [291, 24],
+    [312, 43], [339, 19], [355, 37], [83, 9], [131, 29], [229, 35],
+  ];
+  scattered.forEach(([a, r]) => place(a, r, false));
+
+  // Same block, same instant, same angle.
+  [[152, 20], [154, 24], [155, 29], [157, 22], [158, 27], [160, 25]]
+    .forEach(([a, r]) => place(a, r, true));
+})();
+
+/* The ticker is duplicated so the slide animation loops without a seam. */
+(function () {
+  const items = [
+    'read-only · never touches your wallet',
+    'bundlers · same block, not people reacting',
+    'pools and burn addresses excluded from concentration',
+    'says <b>unknown</b> rather than a reassuring zero',
+    'permission list: <b>storage</b>',
+    'seven chains · one panel',
+    'open source · read it before you install it',
+  ];
+  const row = items.map(t => '<span>' + t + '</span>').join('');
+  document.getElementById('ticker').innerHTML = row + row;
+})();
+</script>
+
+</body>
+</html>

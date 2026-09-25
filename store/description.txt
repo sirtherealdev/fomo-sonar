@@ -1,0 +1,35 @@
+SONAR adds a risk panel to token pages on Fomo Web. It answers the
+question you actually have before you buy: who got in first, who is still
+holding, and can anyone change the rules after you do.
+
+What it shows
+
+• Dev wallet — what the creator holds now, and how much of its initial
+  allocation it has already sold.
+• Bundlers — wallets that bought in the same block or slot as the launch.
+  That is machine timing, not people reacting. Reported as both what they took
+  and what they still hold, because a bundler that already dumped is evidence
+  of a bundled launch, not of a clean one.
+• Funding clusters — when one address paid for a dozen wallets that all
+  bought at the same instant.
+• Snipers — buyers inside the first seconds.
+• Holder concentration — the top ten real wallets, with liquidity pools,
+  burn addresses and program accounts excluded, because counting a pool as a
+  holder makes every healthy token look rugged.
+• Fresh wallets — holders created hours ago or with almost no history.
+• Token controls — whether anyone can still mint new supply, freeze your
+  balance, take tokens out of any wallet, or change the transfer tax.
+
+What it will not do
+
+It is read-only, and deliberately narrow. It never touches your wallet, never
+reads your session, never clicks anything on the page, and never sees any site
+but Fomo. The only permission it asks for is `storage`, used to remember where
+you dragged the panel.
+
+When it cannot measure something, it says so rather than showing a reassuring
+zero — a token whose launch is unreadable is reported as unknown, not as safe.
+
+The source is public. The permission list is three lines, and you can read it.
+
+It works on every chain Fomo Web supports.

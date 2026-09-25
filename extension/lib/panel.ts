@@ -43,7 +43,7 @@ export async function createPanel(): Promise<Panel> {
   panel.style.setProperty('--panel-width', `${PANEL.width}px`);
 
   const header = el('div', 'header');
-  const brand = el('span', 'brand', 'SCOPE');
+  const brand = el('span', 'brand', 'SONAR');
   const ticker = el('span', 'ticker');
   const pill = el('span', 'pill muted', '—');
   const toggle = document.createElement('button');
