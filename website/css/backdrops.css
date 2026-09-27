@@ -1,0 +1,98 @@
+/*
+ * A backdrop per section.
+ *
+ * The page was one unbroken black from the hero down, and the reader had no
+ * sense of having moved. Each section now carries its own faint motif, all
+ * drawn from the same vocabulary the product uses — rings, ticks, grids and
+ * one amber light — so the page changes underfoot without ever competing with
+ * what is written on it.
+ *
+ * Every motif here is CSS. Generated artwork would cost a few hundred
+ * kilobytes each, and the one render we tried had to be thrown away for not
+ * matching the palette; a gradient cannot drift out of the palette.
+ *
+ * Opacities are deliberately near the floor of what is visible. If you can
+ * name the pattern without looking for it, it is too strong.
+ */
+
+section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Content sits above its own backdrop. */
+section > .shell { position: relative; z-index: 1; }
+
+/* --- Live: a radar sweep, frozen mid-turn ------------------------------- */
+#live::before {
+  background: conic-gradient(
+    from 190deg at 88% 6%,
+    rgba(251,191,36,.075), rgba(251,191,36,.02) 9%, transparent 22%);
+}
+
+/* --- Inside Fomo: rings arriving from off-frame, like the panel does ----- */
+#inside::before {
+  background: repeating-radial-gradient(
+    circle at -8% 50%,
+    transparent 0 86px, rgba(255,255,255,.017) 86px 87px);
+  mask-image: linear-gradient(90deg, #000, transparent 72%);
+  -webkit-mask-image: linear-gradient(90deg, #000, transparent 72%);
+}
+
+/* --- What it checks: measurement ticks, because it is a datasheet -------- */
+#checks::before {
+  background: repeating-linear-gradient(
+    90deg, rgba(255,255,255,.035) 0 1px, transparent 1px 46px);
+  mask-image: linear-gradient(180deg, #000, transparent 26%);
+  -webkit-mask-image: linear-gradient(180deg, #000, transparent 26%);
+}
+
+/* --- Precision: one light, low and to the left --------------------------- */
+#precision::before {
+  background: radial-gradient(64% 76% at 10% 96%, rgba(251,191,36,.085), transparent 62%);
+}
+
+/* --- Permissions: a grid that thins out, which is the argument ----------- */
+#permissions::before {
+  background-image:
+    linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(86% 72% at 78% 50%, #000, transparent 72%);
+  -webkit-mask-image: radial-gradient(86% 72% at 78% 50%, #000, transparent 72%);
+}
+
+/* --- Coverage: rings under the orbit, on the same centre ----------------- */
+#coverage::before {
+  background: repeating-radial-gradient(
+    circle at 74% 50%,
+    transparent 0 54px, rgba(251,191,36,.05) 54px 55px);
+  mask-image: radial-gradient(48% 62% at 74% 50%, #000, transparent 78%);
+  -webkit-mask-image: radial-gradient(48% 62% at 74% 50%, #000, transparent 78%);
+}
+
+/* --- Side by side: hatching, the way a comparison gets marked up --------- */
+#compare::before {
+  background: repeating-linear-gradient(
+    135deg, rgba(255,255,255,.016) 0 1px, transparent 1px 24px);
+  mask-image: linear-gradient(180deg, transparent, #000 40%, #000 60%, transparent);
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 40%, #000 60%, transparent);
+}
+
+/* --- Install: the light lands on the one thing being asked for ----------- */
+#install::before {
+  background: radial-gradient(52% 70% at 50% 46%, rgba(251,191,36,.09), transparent 66%);
+}
+
+/* --- Questions: a scatter of nodes, quiet and unconnected ---------------- */
+#faq::before {
+  background-image: radial-gradient(rgba(255,255,255,.05) 1.4px, transparent 1.6px);
+  background-size: 34px 34px;
+  mask-image: radial-gradient(70% 60% at 50% 0%, #000, transparent 70%);
+  -webkit-mask-image: radial-gradient(70% 60% at 50% 0%, #000, transparent 70%);
+}
+
+@media (prefers-reduced-motion: reduce) { section::before { opacity: .7; } }

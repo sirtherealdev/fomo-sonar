@@ -18,6 +18,8 @@
 
 import { PANEL } from './config';
 import { PANEL_STYLES } from './panel.styles';
+import { sonarMark } from './marks';
+import { bubbleMapUrl } from './bubblemaps';
 import { count, pct, shortAddress } from './format';
 import { loadPanelState, savePanelState, type PanelState } from './storage';
 import type { AnalyzeResult } from './api';
@@ -52,7 +54,7 @@ export async function createPanel(): Promise<Panel> {
   toggle.textContent = state.collapsed ? '+' : '–';
   toggle.setAttribute('aria-label', state.collapsed ? 'Expand' : 'Collapse');
 
-  header.append(brand, ticker, el('span', 'spacer'), pill, toggle);
+  header.append(sonarMark(), brand, ticker, el('span', 'spacer'), pill, toggle);
 
   const body = el('div', 'body');
   panel.append(header, body);
@@ -64,35 +66,78 @@ export async function createPanel(): Promise<Panel> {
   document.documentElement.append(host);
 
   toggle.addEventListener('click', () => {
+    const before = topOf();
     state.collapsed = !state.collapsed;
     panel.classList.toggle('collapsed', state.collapsed);
     toggle.textContent = state.collapsed ? '+' : '–';
     toggle.setAttribute('aria-label', state.collapsed ? 'Expand' : 'Collapse');
+    settle(before);
     void savePanelState(state);
   });
 
   const stopDragging = makeDraggable(header, host, state);
 
+  const topOf = (): number | null =>
+    host.style.display === 'none' ? null : host.getBoundingClientRect().top;
+
+  /**
+   * Put the panel back inside the window after anything that could have moved
+   * it out, and keep its header where the reader left it.
+   *
+   * The offsets are measured from the bottom edge, so a change in height moves
+   * the top: collapsing dropped the header to where the panel's foot had been,
+   * and each pass of results landing shoved it upward. Either way the one part
+   * you are looking at — and the only part you can drag — jumped.
+   *
+   * Callers pass the header's position from *before* they changed anything;
+   * the bottom offset is then recomputed to put it back there.
+   */
+  let settleQueued = false;
+  const settle = (keepTop: number | null = null): void => {
+    if (settleQueued) return;
+    settleQueued = true;
+    requestAnimationFrame(() => {
+      settleQueued = false;
+      if (host.style.display === 'none') return;
+
+      if (keepTop !== null) {
+        const height = host.getBoundingClientRect().height;
+        state.bottom = window.innerHeight - height - keepTop;
+      }
+      clampToViewport(host, state);
+      applyPosition(host, state);
+    });
+  };
+
+  // A resize only re-clamps; there is no height change to compensate for.
+  const onResize = (): void => settle();
+  window.addEventListener('resize', onResize, { passive: true });
+
   return {
     showLoading(label: string): void {
+      const before = topOf();
       host.style.display = '';
       ticker.textContent = label;
       setPill(pill, 'muted', 'scanning');
       render(body, skeleton());
+      settle(before);
     },
 
     showResult(result: AnalyzeResult): void {
+      const before = topOf();
       host.style.display = '';
 
       if (result.status === 'unsupported') {
         setPill(pill, 'muted', result.chain);
         render(body, notice(`Risk analysis for ${result.chain} is not available yet.`));
+        settle(before);
         return;
       }
 
       if (result.status === 'error') {
         setPill(pill, 'muted', '—');
         render(body, notice("Can't analyse this token."));
+        settle(before);
         return;
       }
 
@@ -100,6 +145,7 @@ export async function createPanel(): Promise<Panel> {
       ticker.textContent = data.token.symbol ?? shortAddress(data.mint);
       setPill(pill, data.riskLevel, data.riskLevel);
       render(body, report(data));
+      settle(before);
     },
 
     hide(): void {
@@ -108,6 +154,7 @@ export async function createPanel(): Promise<Panel> {
 
     destroy(): void {
       stopDragging();
+      window.removeEventListener('resize', onResize);
       host.remove();
     },
   };
@@ -135,25 +182,70 @@ function report(data: AnalyzeResponse): Node[] {
   const flags = securityFlags(data);
   if (flags) nodes.push(flags);
 
-  if (data.warnings.length > 0) nodes.push(warnings(data.warnings));
-
   nodes.push(footer(data));
   return nodes;
 }
 
 /** The actual wallets behind the concentration number. */
+/**
+ * Top holders, spelled out: who holds what, with a bar per row.
+ *
+ * A single stacked bar showed the shape but hid the wallets, and bubbles sized
+ * by holding collapse into identical circles whenever a token is evenly spread.
+ * A row each keeps the address and the figure readable, and the bar — scaled to
+ * the largest holder, not to the whole supply — makes the differences between
+ * them visible even when every number starts with a 2.
+ */
 function topHolderList(data: AnalyzeResponse): HTMLElement | null {
-  if (data.topHolders.list.length === 0) return null;
+  const list = data.topHolders.list.slice(0, 8);
+  const largest = list[0];
+  if (!largest) return null;
 
   const wrap = el('div', 'block');
-  wrap.append(el('div', 'block-title', 'Top holders'));
 
-  for (const holder of data.topHolders.list.slice(0, 5)) {
-    const line = el('div', 'holder');
-    line.append(el('span', 'mono', shortAddress(holder.address)), el('span', 'figure', pct(holder.pct)));
-    if (holder.highActivity) line.append(el('span', 'tag', 'exchange?'));
-    wrap.append(line);
+  const held = data.topHolders.list.reduce((sum, h) => sum + h.pct, 0);
+  const head = el('div', 'block-head');
+  head.append(
+    el('div', 'block-title', 'Top holders'),
+    el('div', 'block-aside', `${count(data.topHolders.list.length)} hold ${pct(held)}`),
+  );
+
+  // Their map is the better tool for looking at how these wallets connect;
+  // opening in a new tab so a click never takes the reader off the trade.
+  const mapUrl = bubbleMapUrl(data.chain, data.mint);
+  if (mapUrl) {
+    const link = document.createElement('a');
+    link.className = 'maplink';
+    link.href = mapUrl;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = 'bubble map';
+    link.title = 'Open this token on Bubblemaps';
+    head.append(link);
   }
+
+  wrap.append(head);
+
+  const rows = el('div', 'holders');
+  list.forEach((holder, i) => {
+    const line = el('div', `hrow${holder.highActivity ? ' flagged' : ''}`);
+
+    const track = el('span', 'hbar');
+    const fill = el('span', holder === largest ? 'hfill top' : 'hfill');
+    fill.style.width = `${Math.max(3, (holder.pct / largest.pct) * 100)}%`;
+    track.append(fill);
+
+    line.append(
+      el('span', 'hrank', `#${i + 1}`),
+      el('span', 'haddr', shortAddress(holder.address)),
+      track,
+      el('span', 'hpct', pct(holder.pct)),
+    );
+    // The full address stays one hover away rather than eating the row.
+    line.title = `${holder.address}\n${pct(holder.pct)} of supply${holder.highActivity ? ' · high activity, may be an exchange' : ''}`;
+    rows.append(line);
+  });
+  wrap.append(rows);
 
   if (data.topHolders.excluded.length > 0) {
     wrap.append(
@@ -194,37 +286,63 @@ function score(data: AnalyzeResponse): HTMLElement {
   // Withhold the number too, not just the label: a reader takes "12" as a
   // verdict no matter what the caption underneath says.
   if (data.riskLevel === 'unknown') {
-    const meta = el('div', 'meta');
-    meta.append(
-      el('div', 'caption', `Only ${Math.round(data.coverage)}% of the risk signals could be measured for this token.`),
+    wrap.append(
+      dial(0, 'unknown', '?', 'unknown'),
+      el('div', 'caption', `Only ${Math.round(data.coverage)}% of this token could be measured, so no score is given.`),
     );
-    wrap.append(el('div', 'number unknown', '?'), meta);
     return wrap;
   }
 
-  const number = el('div', `number ${data.riskLevel}`, String(data.riskScore));
-
-  const bar = el('div', 'bar');
-  const fill = el('span', data.riskLevel);
-  fill.style.width = `${Math.max(2, Math.min(100, data.riskScore))}%`;
-  bar.append(fill);
-
-  const meta = el('div', 'meta');
-  // Naming the reason turns a number into something actionable. A forced floor
-  // is always the reason when there is one: it is what set the score.
-  const top = [...data.factors].sort((a, b) => b.points - a.points)[0];
-  const reason = data.scoreFloor
-    ? `${factorLabel(data.scoreFloor.key)} alone`
-    : top
-      ? `driven by ${factorLabel(top.key)}`
-      : 'risk score';
-  // Say so while the wallet-level signals are still landing, so a score that
-  // moves a moment later does not look like the panel changing its mind.
-  const caption = data.phase === 'partial' ? `${reason} · still checking wallets` : reason;
-  meta.append(bar, el('div', 'caption', caption));
-
-  wrap.append(number, meta);
+  // No caption under the dial. The rows below already name every factor and
+  // show its figure, so a line restating the largest one was repeating what
+  // the reader is about to look at anyway.
+  wrap.append(dial(data.riskScore, data.riskLevel, String(data.riskScore), data.riskLevel));
   return wrap;
+}
+
+/**
+ * The ring is one stroke; the score is how much of it is drawn.
+ *
+ * The empty middle carries the reading rather than a caption underneath: what
+ * it measures, the number, and where that number falls. Stacked inside the
+ * gauge they read as one object instead of three stray lines.
+ */
+function dial(value: number, level: string, label: string, verdict: string): HTMLElement {
+  const R = 42;
+  const C = 2 * Math.PI * R;
+  const shown = Math.max(0, Math.min(100, value));
+
+  const svg = svgEl('svg');
+  svg.setAttribute('viewBox', '0 0 96 96');
+
+  const track = svgEl('circle');
+  track.setAttribute('class', 'track');
+  const fill = svgEl('circle');
+  fill.setAttribute('class', `fill ${level}`);
+  fill.setAttribute('stroke-dasharray', String(C));
+  fill.setAttribute('stroke-dashoffset', String(C * (1 - shown / 100)));
+
+  for (const c of [track, fill]) {
+    c.setAttribute('cx', '48');
+    c.setAttribute('cy', '48');
+    c.setAttribute('r', String(R));
+  }
+  svg.append(track, fill);
+
+  const mid = el('div', `mid ${level}`);
+  mid.append(
+    el('span', 'mid-cap', 'RISK'),
+    el('span', 'mid-num', label),
+    el('span', `mid-verdict ${level}`, verdict.toUpperCase()),
+  );
+
+  const wrap = el('div', 'dial');
+  wrap.append(svg, mid);
+  return wrap;
+}
+
+function svgEl(name: string): SVGElement {
+  return document.createElementNS('http://www.w3.org/2000/svg', name);
 }
 
 function signals(data: AnalyzeResponse): HTMLElement {
@@ -236,11 +354,12 @@ function signals(data: AnalyzeResponse): HTMLElement {
       data.dev.unavailable ? null : pct(data.dev.holdingPct),
       data.dev.unavailable ? unavailableText(data.dev.unavailable) : `${pct(data.dev.soldPct)} sold`,
       data.dev.unavailable === 'pending',
+      data.dev.unavailable ? null : tone(data.dev.holdingPct),
     ),
     // Bundlers and snipers report the worse of "holds now" and "took at launch":
     // wallets that already sold their launch allocation must not read as clean.
     launchRow('Bundlers', data.bundles.holdingPct, data.bundles.boughtPct, data.bundles.walletCount, data.bundles.unavailable),
-    row('Top 10 holders', pct(data.topHolders.top10Pct), topHolderNote(data)),
+    row('Top 10 holders', pct(data.topHolders.top10Pct), topHolderNote(data), false, tone(data.topHolders.top10Pct)),
     launchRow('Snipers', data.snipers.holdingPct, data.snipers.boughtPct, data.snipers.count, data.snipers.unavailable),
     countRow('Insiders', data.insiders, `${count(data.insiders.count)} wallets`),
     countRow('Fresh wallets', data.freshWallets, `${count(data.freshWallets.count)} wallets`),
@@ -260,6 +379,7 @@ function countRow(
     unavailable ? null : pct(value.holdingPct),
     unavailable ? unavailableText(unavailable) : sub,
     unavailable === 'pending',
+    unavailable ? null : tone(value.holdingPct),
   );
 }
 
@@ -283,7 +403,8 @@ function launchRow(
       ? `${count(wallets)} wallets · took ${pct(bought)}, sold most`
       : `${count(wallets)} wallets`;
 
-  return row(name, pct(Math.max(holdingPct, bought)), sub);
+  const worst = Math.max(holdingPct, bought);
+  return row(name, pct(worst), sub, false, tone(worst));
 }
 
 function topHolderNote(data: AnalyzeResponse): string {
@@ -292,12 +413,41 @@ function topHolderNote(data: AnalyzeResponse): string {
   return 'excl. pools';
 }
 
-function row(name: string, figure: string | null, sub: string, pending = false): HTMLElement {
+function row(
+  name: string,
+  figure: string | null,
+  sub: string,
+  pending = false,
+  level: RowLevel = null,
+): HTMLElement {
   const wrap = el('div', figure === null ? 'row unknown' : 'row');
   // A row still being measured says so, rather than claiming it is unknowable.
   const placeholder = pending ? '…' : 'unknown';
-  wrap.append(el('span', 'name', name), el('span', 'figure', figure ?? placeholder), el('span', 'sub', sub));
+  const tone = figure === null ? '' : (level ?? '');
+
+  wrap.append(
+    el('span', `dot ${tone}`.trim()),
+    el('span', 'name', name),
+    el('span', `figure ${tone}`.trim(), figure ?? placeholder),
+  );
+  if (sub) wrap.append(el('span', 'sub', sub));
   return wrap;
+}
+
+type RowLevel = 'low' | 'medium' | 'high' | null;
+
+/**
+ * The dot's colour, from the share of supply a signal accounts for.
+ *
+ * Deliberately coarse and shared by every row: a reader scanning the column
+ * should be able to tell "fine / watch / bad" without reading a single number,
+ * and a per-signal scale would make that impossible.
+ */
+function tone(pctValue: number | null): RowLevel {
+  if (pctValue === null) return null;
+  if (pctValue >= 20) return 'high';
+  if (pctValue >= 5) return 'medium';
+  return 'low';
 }
 
 function securityFlags(data: AnalyzeResponse): HTMLElement | null {
@@ -322,27 +472,44 @@ function securityFlags(data: AnalyzeResponse): HTMLElement | null {
     flag(data.security.canFreeze ? 'Can freeze' : 'Freeze revoked', !data.security.canFreeze),
   );
 
-  // Neutral on purpose: paying for a DexScreener profile says someone spent
-  // money on presentation, not that the token is safe. Green would lie.
-  if (data.market?.dexPaid === true) wrap.append(neutralFlag('Dex paid'));
-
   return wrap;
 }
 
-function warnings(messages: string[]): HTMLElement {
-  const wrap = el('div', 'warnings');
-  // Cap the list: five caveats in a 300px panel is a wall, not information.
-  for (const message of messages.slice(0, 3)) wrap.append(el('div', 'warning', message));
-  return wrap;
-}
 
 function footer(data: AnalyzeResponse): HTMLElement {
   const wrap = el('div', 'footer');
   const age = tokenAge(data.meta.createdAt);
-  wrap.append(
-    el('span', '', age ? `${count(data.holderCount)} holders · ${age} old` : `${count(data.holderCount)} holders`),
-    el('span', '', data.meta.cached ? 'cached' : `${data.meta.durationMs} ms`),
-  );
+
+  /*
+   * "Dex paid" sits here rather than with the security chips.
+   *
+   * Those answer one question — what can still be done to this token — and a
+   * grey chip about who paid DexScreener for a profile answered a different
+   * one, so it read as the odd item in the row and wrapped onto a line of its
+   * own. It is a fact about the listing, which is what this line is for.
+   */
+  const facts = [`${count(data.holderCount)} holders`];
+  if (age) facts.push(`${age} old`);
+  if (data.market?.dexPaid === true) facts.push('dex paid');
+
+  wrap.append(el('span', '', facts.join(' · ')));
+
+  /*
+   * Where the caveats went.
+   *
+   * Spelled out, three of them filled a third of the panel and got skipped for
+   * being a wall of yellow. They still matter: every one of them means a count
+   * is a floor rather than a total, so a clean-looking row could be hiding more.
+   * One mark keeps that disclosed without spending the space, and the full
+   * text is a hover away.
+   */
+  if (data.warnings.length > 0) {
+    const mark = el('span', 'caveat', 'lower bound');
+    mark.title = data.warnings.join('\n\n');
+    wrap.append(mark);
+  }
+
+  wrap.append(el('span', '', data.meta.cached ? 'cached' : `${data.meta.durationMs} ms`));
   return wrap;
 }
 
@@ -386,8 +553,9 @@ function makeDraggable(handle: HTMLElement, host: HTMLElement, state: PanelState
   const onPointerMove = (event: PointerEvent): void => {
     // Anchored to the right and bottom edges, so moving the pointer right or
     // down *decreases* the offsets.
-    state.right = clamp(startRight - (event.clientX - startX), 0, window.innerWidth - 60);
-    state.bottom = clamp(startBottom - (event.clientY - startY), 0, window.innerHeight - 40);
+    state.right = startRight - (event.clientX - startX);
+    state.bottom = startBottom - (event.clientY - startY);
+    clampToViewport(host, state);
     applyPosition(host, state);
   };
 
@@ -439,9 +607,6 @@ function flag(text: string, safe: boolean): HTMLElement {
   return el('span', `flag ${safe ? 'safe' : 'danger'}`, text);
 }
 
-function neutralFlag(text: string): HTMLElement {
-  return el('span', 'flag neutral', text);
-}
 
 function setPill(pill: HTMLElement, level: string, text: string): void {
   pill.className = `pill ${level}`;
@@ -457,23 +622,37 @@ function applyPosition(host: HTMLElement, state: PanelState): void {
   host.style.bottom = `${state.bottom}px`;
 }
 
+/**
+ * Keep the whole panel on screen, not just its anchor point.
+ *
+ * The offsets are measured from the right and bottom edges, so the limit is the
+ * viewport minus the panel's own size. Bounding the anchor alone let `right`
+ * grow until the panel hung off the left edge and `bottom` until its header sat
+ * above the top of the window — at which point there was nothing left to drag
+ * it back by.
+ *
+ * Re-run whenever the window resizes or the panel's height changes: a position
+ * saved in a wide window is off-screen in a narrow one, and the panel grows
+ * upward as results arrive.
+ */
+function clampToViewport(host: HTMLElement, state: PanelState): void {
+  const box = host.getBoundingClientRect();
+  const width = box.width || PANEL.width;
+  const height = box.height || 0;
+
+  // On a viewport too small to hold the panel, favour the top-left corner
+  // being visible: the header lives there and it is the only way to move it.
+  const maxRight = Math.max(PANEL.margin, window.innerWidth - width - PANEL.margin);
+  const maxBottom = Math.max(PANEL.margin, window.innerHeight - height - PANEL.margin);
+
+  state.right = clamp(state.right, PANEL.margin, maxRight);
+  state.bottom = clamp(state.bottom, PANEL.margin, maxBottom);
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function factorLabel(key: string): string {
-  const labels: Record<string, string> = {
-    devHolding: 'dev holding',
-    devSold: 'dev selling',
-    bundles: 'bundled wallets',
-    topHolders: 'holder concentration',
-    snipers: 'snipers',
-    freshWallets: 'fresh wallets',
-    insiders: 'insider wallets',
-    authorities: 'live token authorities',
-  };
-  return labels[key] ?? key;
-}
 
 function unavailableText(reason: string): string {
   const reasons: Record<string, string> = {

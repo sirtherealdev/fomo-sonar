@@ -136,8 +136,16 @@ export const SCORING = {
     insiders: { atLeast: 15, floor: 66 },
     /** Brand-new wallets holding two fifths of the supply. */
     freshWallets: { atLeast: 40, floor: 62 },
-    /** The dev has emptied its allocation. */
-    devSold: { atLeast: 90, floor: 55 },
+    /*
+     * No floor for devSold.
+     *
+     * On the launchpads Fomo lists, a creator selling its whole allocation is
+     * the normal case rather than the exception, so a floor here fired on
+     * almost every token and pinned the whole market at medium. A score that
+     * says the same thing about everything says nothing. It still carries its
+     * weight in the sum — a dev that dumped is worse than one that did not —
+     * it just no longer sets the verdict on its own.
+     */
     /** Mint authority is live: the supply you see is not final. */
     authorities: { atLeast: 100, floor: 75 },
   },

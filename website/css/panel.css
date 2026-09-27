@@ -1,0 +1,221 @@
+/*
+ * The live panel demo: the phase list on the left and the recreated
+ * extension panel on the right, including its dial, rows, holder map,
+ * control chips and closing line.
+ */
+
+/* --- Live panel demo ----------------------------------------------------
+   A recreation of the extension panel rather than a screenshot, so it can
+   fill in the way the real one does: three passes, no guessed values. */
+#live .split { align-items: center; }
+
+.phases { list-style: none; margin-top: 36px; }
+.phases li {
+  display: grid; grid-template-columns: 44px 1fr; gap: 18px;
+  padding: 20px 0 20px 18px; margin-left: -18px;
+  border-top: 1px solid var(--line);
+  opacity: .42; transition: opacity .45s, background .45s, box-shadow .45s;
+}
+.phases li.on {
+  opacity: 1;
+  background: linear-gradient(90deg, rgba(251,191,36,.05), transparent 60%);
+  box-shadow: inset 2px 0 0 var(--amber);
+}
+.pn {
+  font-family: var(--mono); font-size: 12px; letter-spacing: .1em;
+  color: var(--amber); padding-top: 3px;
+}
+.phases b { font-size: 15.8px; font-weight: 600; }
+.phases em {
+  font-style: normal; font-family: var(--mono); font-size: 11.5px;
+  color: var(--text-faint); margin-left: 10px;
+}
+.phases li p { font-size: 14.2px; color: var(--text-dim); margin-top: 7px; max-width: 46ch; }
+
+/* The real panel is 320px wide. Capping the recreation keeps it honest, and
+   stops it ballooning to the full shell when the split stacks on narrow
+   screens. */
+.demo { position: relative; max-width: 400px; margin-inline: auto; width: 100%; }
+.demo::before {
+  content: ""; position: absolute; inset: -14% -8%;
+  background: radial-gradient(60% 55% at 55% 45%, rgba(251,191,36,.13), transparent 70%);
+  filter: blur(24px); pointer-events: none;
+}
+.glass {
+  position: relative; border-radius: 20px;
+  border: 1px solid var(--line-bright);
+  background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.012)), #0b0e13;
+  box-shadow: 0 34px 80px rgba(0,0,0,.6);
+  padding: 20px 22px 22px; overflow: hidden;
+}
+.demo-note {
+  margin-top: 16px; text-align: center;
+  font-family: var(--mono); font-size: 11.5px; color: var(--text-faint);
+}
+
+.p-head { display: flex; align-items: center; gap: 8px; }
+.p-logo { display: block; flex: none; }
+.p-brand { font-weight: 700; letter-spacing: .2em; font-size: 11px; color: var(--text-faint); }
+.p-sym { font-weight: 600; font-size: 14px; }
+/* The chain is shown by its own mark rather than spelled out — the panel
+   header is tight, and a trader recognises the logo faster than the word. */
+.p-pill {
+  margin-left: auto;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em;
+  text-transform: uppercase; padding: 3px 9px; border-radius: 999px;
+  background: rgba(255,255,255,.06); color: var(--text-faint);
+  transition: background .4s, color .4s;
+}
+.p-pill.low    { background: rgba(74,222,128,.14);  color: var(--safe); }
+.p-pill.med    { background: rgba(251,191,36,.16);  color: var(--amber); }
+.p-pill.high   { background: rgba(248,113,113,.16); color: var(--danger); }
+.p-min { color: var(--text-faint); margin-left: 2px; }
+
+/* The dial is the whole point of the redesign: one thing to look at, and it
+   draws itself instead of a bar sliding across. */
+.p-dial { position: relative; width: 152px; margin: 16px auto 0; }
+.p-dial svg { width: 100%; display: block; transform: rotate(-90deg); }
+.p-dial circle { fill: none; stroke-width: 7; stroke-linecap: round; }
+.d-track { stroke: rgba(255,255,255,.07); }
+.d-fill {
+  stroke: var(--amber);
+  stroke-dasharray: 351.9; stroke-dashoffset: 351.9;
+  transition: stroke-dashoffset 1.3s cubic-bezier(.22,1,.36,1), stroke .6s;
+}
+.d-fill.low  { stroke: var(--safe); }
+.d-fill.med  { stroke: var(--amber); }
+.d-fill.high { stroke: var(--danger); }
+.d-mid {
+  position: absolute; inset: 0;
+  display: grid; place-content: center; justify-items: center; gap: 2px;
+  line-height: 1;
+}
+.d-cap { font-size: 9px; letter-spacing: .18em; color: var(--text-faint); font-weight: 600; }
+.d-verdict { font-size: 9.5px; letter-spacing: .14em; font-weight: 700; color: var(--text-faint); }
+.d-verdict.low  { color: var(--safe); }
+.d-verdict.med  { color: var(--amber); }
+.d-verdict.high { color: var(--danger); }
+.p-num {
+  font-size: 40px; font-weight: 600; letter-spacing: -.04em;
+  line-height: 1; color: var(--text-faint); transition: color .5s;
+  font-variant-numeric: tabular-nums;
+}
+.p-num.low  { color: var(--safe); }
+.p-num.med  { color: var(--amber); }
+.p-num.high { color: var(--danger); }
+.p-badge {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .18em;
+  text-transform: uppercase; padding: 4px 10px; border-radius: 999px;
+  background: rgba(255,255,255,.06); color: var(--text-faint);
+  transition: background .4s, color .4s;
+}
+.p-badge.low  { background: rgba(74,222,128,.14);  color: var(--safe); }
+.p-badge.med  { background: rgba(251,191,36,.16);  color: var(--amber); }
+.p-badge.high { background: rgba(248,113,113,.16); color: var(--danger); }
+.p-why {
+  text-align: center; margin: 14px 0 4px;
+  font-size: 12.5px; color: var(--text-faint);
+}
+
+.p-rows { margin-top: 12px; }
+.p-row {
+  display: grid; grid-template-columns: 9px 1fr auto;
+  gap: 4px 11px; align-items: center; padding: 9px 4px;
+  border-top: 1px solid var(--line);
+}
+.p-row > i {
+  grid-column: 2 / 4; justify-self: end;
+  font-style: normal; font-family: var(--mono);
+  font-size: 10.5px; color: var(--text-faint); margin-top: -3px;
+}
+.p-row:not(.in) > i { visibility: hidden; }
+/* A bubble per row, the same glyph as the logo and the hero. */
+.p-row u {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--text-faint); opacity: .35; transition: all .5s;
+}
+.p-row > span { color: var(--text-dim); font-size: 14px; }
+.p-row > b {
+  font-family: var(--mono); font-weight: 500; font-size: 14px;
+  color: var(--text-faint); transition: color .4s;
+}
+.p-row:not(.in) > b { color: transparent; }
+.p-row:not(.in) > b::after {
+  content: "···"; color: var(--text-faint); letter-spacing: .1em;
+  animation: blink 1.4s ease-in-out infinite;
+}
+.p-row.in u { opacity: 1; background: var(--safe); box-shadow: 0 0 10px rgba(74,222,128,.5); }
+.p-row.in b.bad  { color: var(--danger); }
+.p-row.in b.warn { color: var(--amber); }
+.p-row.in b.ok   { color: var(--safe); }
+.p-row.in b { color: var(--text); animation: land .5s both; }
+.p-row.in:has(b.ok)   u { background: var(--safe);   box-shadow: 0 0 10px rgba(74,222,128,.5); }
+.p-row.in:has(b.warn) u { background: var(--amber);  box-shadow: 0 0 10px rgba(251,191,36,.5); }
+.p-row.in:has(b.bad)  u { background: var(--danger); box-shadow: 0 0 10px rgba(248,113,113,.5); }
+@keyframes blink { 50% { opacity: .3 } }
+@keyframes land { from { opacity: 0; transform: translateY(5px) } to { opacity: 1; transform: none } }
+
+/* --- The blocks that carry the detail, mirroring the extension ---------- */
+.p-block {
+  margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line);
+  opacity: 0; transform: translateY(5px);
+  transition: opacity .55s, transform .55s;
+}
+.p-block.in { opacity: 1; transform: none; }
+
+.p-cap-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.p-cap {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--text-faint);
+}
+.p-aside {
+  margin-left: auto; font-family: var(--mono);
+  font-size: 9.5px; color: var(--text-faint);
+}
+.p-maplink {
+  font-size: 9.5px; color: var(--text-faint);
+  border-bottom: 1px dotted rgba(255,255,255,.22); padding-bottom: 1px;
+}
+
+/* One row per holder: rank, address, bar, figure. The bar is scaled to the
+   largest holder, not to the supply — against the supply every row on an
+   evenly spread token would be an invisible sliver. */
+.p-holders { display: grid; gap: 1px; }
+.hrow {
+  display: grid; grid-template-columns: 17px 64px 1fr 44px;
+  align-items: center; gap: 8px; padding: 3px;
+  border-radius: 4px;
+}
+.hrow:hover { background: rgba(255,255,255,.025); }
+.hrank { font-family: var(--mono); font-size: 9px; color: var(--text-faint); }
+.haddr { font-family: var(--mono); font-size: 10.5px; color: var(--text-dim); }
+.hbar { height: 5px; border-radius: 999px; background: rgba(255,255,255,.06); overflow: hidden; }
+.hfill { display: block; height: 100%; border-radius: 999px; background: #39414f; }
+.hfill.top { background: var(--amber); }
+.hpct {
+  text-align: right; font-family: var(--mono);
+  font-size: 10.5px; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+
+.p-note {
+  margin-top: 10px; font-family: var(--mono);
+  font-size: 10px; color: var(--text-faint);
+}
+
+.p-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.p-chips span {
+  font-size: 11.5px; padding: 5px 10px; border-radius: 999px;
+  border: 1px solid transparent;
+}
+.c-bad { background: rgba(248,113,113,.12); color: var(--danger); border-color: rgba(248,113,113,.28); }
+.c-ok  { background: rgba(74,222,128,.1);  color: var(--safe);   border-color: rgba(74,222,128,.25); }
+
+.p-foot {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line);
+  font-family: var(--mono); font-size: 10.5px; color: var(--text-faint);
+}
+.p-foot .p-ms { margin-left: auto; }
+/* The extension's own marker for "these counts are floors, not totals". */
+.caveat { color: #9a7c28; border-bottom: 1px dotted #6b5719; }
+.caveat::before { content: "!"; font-weight: 700; margin-right: 3px; }

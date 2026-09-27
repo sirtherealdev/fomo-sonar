@@ -82,7 +82,7 @@ export async function fetchMarket(chain: ChainId, mint: string): Promise<MarketR
     pairAddress: pair.pairAddress ?? null,
     pairCreatedAt: pair.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : null,
     firstPairCreatedAt: earliest ? new Date(earliest).toISOString() : null,
-    dexPaid: dexPaid(paidOrder, pair),
+    dexPaid: dexPaid(paidOrder),
     source: 'dexscreener',
   };
 
@@ -105,19 +105,20 @@ async function fetchPairs(mint: string): Promise<DexPair[]> {
 }
 
 /**
- * "Dex Paid": did anyone pay DexScreener to attach a profile to this token.
- * Not a safety guarantee — it only says someone spent money on presentation,
- * which is still a useful "is this a five-minute throwaway" signal.
+ * "Dex Paid": did anyone actually pay DexScreener for an Enhanced Token Info
+ * order. Not a safety guarantee — it only says someone spent money on
+ * presentation, which is still a useful "is this a five-minute throwaway"
+ * signal.
  *
- * Two sources, because neither is complete on its own: the orders endpoint
- * only reliably lists recent orders, while the presence of socials and a
- * website on the pair is the visible result of a paid Enhanced Token Info.
+ * Only the orders endpoint decides this. An earlier version also treated the
+ * presence of socials or a website on the pair as proof of payment, which was
+ * wrong: launchpads and community submissions attach those to plenty of
+ * tokens nobody ever paid for, so the flag fired on tokens whose profile had
+ * merely been filled in. If the orders endpoint cannot be reached we return
+ * null and the panel shows nothing, rather than guessing.
  */
-function dexPaid(paidOrder: boolean | null, pair: DexPair): boolean | null {
-  if (paidOrder) return true;
-  const hasProfile = (pair.info?.socials?.length ?? 0) > 0 || (pair.info?.websites?.length ?? 0) > 0;
-  if (hasProfile) return true;
-  return paidOrder === null ? null : false;
+function dexPaid(paidOrder: boolean | null): boolean | null {
+  return paidOrder;
 }
 
 /** Orders endpoint only: approved tokenProfile purchases. */

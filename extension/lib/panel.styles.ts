@@ -18,7 +18,7 @@ export const PANEL_STYLES = `
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 .panel {
-  width: var(--panel-width, 300px);
+  width: var(--panel-width, 320px);
   background: #0e1014;
   border: 1px solid #23262e;
   border-radius: 12px;
@@ -33,7 +33,7 @@ export const PANEL_STYLES = `
 .header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   padding: 9px 10px;
   background: #14171d;
   border-bottom: 1px solid #23262e;
@@ -43,7 +43,7 @@ export const PANEL_STYLES = `
 .header.dragging { cursor: grabbing; }
 
 .brand { font-size: 11px; font-weight: 700; letter-spacing: .09em; color: #8b93a5; }
-.ticker { font-weight: 600; color: #e7e9ee; margin-left: 2px; }
+.ticker { font-weight: 600; color: #e7e9ee; margin-left: 1px; }
 .spacer { flex: 1; }
 
 .pill {
@@ -78,9 +78,9 @@ export const PANEL_STYLES = `
  * stays put, so it can always be grabbed and dragged.
  */
 .body {
-  padding: 10px;
+  padding: 12px;
   display: grid;
-  gap: 10px;
+  gap: 11px;
   max-height: min(70vh, 520px);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -119,28 +119,127 @@ export const PANEL_STYLES = `
 
 .divider { height: 1px; background: #1e222a; }
 
-/* Risk score. */
-.score { display: flex; align-items: center; gap: 10px; }
-.score .number { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
-.score .number.low    { color: #4ade80; }
-.score .number.medium { color: #fbbf24; }
-.score .number.high   { color: #f87171; }
-.score .number.unknown { color: #5f6676; }
-.score .meta { flex: 1; display: grid; gap: 4px; }
-.bar { height: 4px; border-radius: 999px; background: #1e222a; overflow: hidden; }
-.bar > span { display: block; height: 100%; border-radius: 999px; }
-.bar > span.low    { background: #4ade80; }
-.bar > span.medium { background: #fbbf24; }
-.bar > span.high   { background: #f87171; }
-.score .caption { font-size: 10px; color: #767e91; }
+/*
+ * Risk score as a dial rather than a number beside a bar.
+ *
+ * The bar version put four competing elements on one line and the eye had
+ * nowhere to land first. One ring, one number, one sentence underneath.
+ */
+.score { display: grid; justify-items: center; gap: 8px; padding: 4px 0 2px; }
+.dial { position: relative; width: 96px; height: 96px; }
+.dial svg { width: 100%; height: 100%; transform: rotate(-90deg); display: block; }
+.dial circle { fill: none; stroke-width: 6; stroke-linecap: round; }
+.dial .track { stroke: #1e222a; }
+.dial .fill { transition: stroke-dashoffset .8s cubic-bezier(.22,1,.36,1); }
+.dial .fill.low    { stroke: #4ade80; }
+.dial .fill.medium { stroke: #fbbf24; }
+.dial .fill.high   { stroke: #f87171; }
+.dial .mid {
+  position: absolute; inset: 0;
+  display: grid; place-content: center; justify-items: center;
+  gap: 1px;
+  line-height: 1;
+}
+.dial .mid-cap {
+  font-size: 8px; letter-spacing: .16em; color: #5f6676; font-weight: 600;
+}
+.dial .mid-num {
+  font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.dial .mid-verdict { font-size: 8.5px; letter-spacing: .13em; font-weight: 700; }
+.dial .mid.low     .mid-num { color: #4ade80; }
+.dial .mid.medium  .mid-num { color: #fbbf24; }
+.dial .mid.high    .mid-num { color: #f87171; }
+.dial .mid.unknown .mid-num { color: #5f6676; font-size: 26px; }
+.mid-verdict.low     { color: #4ade80; }
+.mid-verdict.medium  { color: #fbbf24; }
+.mid-verdict.high    { color: #f87171; }
+.mid-verdict.unknown { color: #5f6676; }
+.score .caption { font-size: 10.5px; color: #767e91; text-align: center; max-width: 30ch; }
 
-/* Signal rows. */
-.rows { display: grid; gap: 5px; }
-.row { display: flex; align-items: baseline; gap: 8px; }
-.row .name { color: #a7aebe; flex: 1; }
+/*
+ * Signal rows: a dot carrying the colour, the name, the figure. Anything
+ * further goes on a second line in the corner, so a long qualifier can never
+ * push the figure out of alignment or wrap into the next row.
+ */
+.rows { display: grid; gap: 2px; }
+.row {
+  display: grid;
+  grid-template-columns: 7px 1fr auto;
+  align-items: center;
+  column-gap: 9px; row-gap: 1px;
+  padding: 5px 0;
+}
+.row + .row { border-top: 1px solid #191c23; }
+.row .dot { width: 7px; height: 7px; border-radius: 50%; background: #2a2f3a; }
+.row .dot.low    { background: #4ade80; }
+.row .dot.medium { background: #fbbf24; }
+.row .dot.high   { background: #f87171; }
+.row .name { color: #a7aebe; }
 .row .figure { font-weight: 600; font-variant-numeric: tabular-nums; }
-.row .sub { color: #767e91; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.row .figure.low    { color: #6ee7a0; }
+.row .figure.medium { color: #fbbf24; }
+.row .figure.high   { color: #f87171; }
+.row .sub {
+  grid-column: 2 / 4;
+  justify-self: end;
+  color: #6b7284;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
 .row.unknown .figure { color: #767e91; font-weight: 500; }
+
+/*
+ * Top holders, one row each: rank, address, a bar, the figure. The bar is
+ * scaled to the largest holder rather than to the whole supply, so on an
+ * evenly spread token the rows still differ visibly from one another.
+ */
+.block-head { display: flex; align-items: baseline; gap: 8px; }
+.block-head .block-aside { margin-left: auto; }
+.block-aside {
+  margin-left: auto;
+  font-size: 9.5px;
+  color: #767e91;
+  font-variant-numeric: tabular-nums;
+}
+/* Reads as a link without borrowing the page's link colour. */
+.maplink {
+  font-size: 9.5px;
+  color: #8b93a5;
+  text-decoration: none;
+  border-bottom: 1px dotted #3a4150;
+  padding-bottom: 1px;
+}
+.maplink::after { content: " ↗"; }
+.maplink:hover { color: #d9a028; border-bottom-color: #8a6a1a; }
+
+.holders { display: grid; gap: 1px; margin-top: 4px; }
+.hrow {
+  display: grid;
+  grid-template-columns: 17px 62px 1fr 42px;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 3px;
+  border-radius: 4px;
+}
+.hrow:hover { background: #14171d; }
+.hrank { font-size: 9px; color: #5f6676; font-variant-numeric: tabular-nums; }
+.haddr {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  color: #a7aebe;
+}
+.hbar { height: 5px; border-radius: 999px; background: #191d24; overflow: hidden; }
+.hfill { display: block; height: 100%; border-radius: 999px; background: #39414f; }
+.hfill.top { background: #d9a028; }
+.hrow.flagged .hfill { background: #b4494c; }
+.hrow.flagged .haddr { color: #e08a8c; }
+.hpct {
+  text-align: right;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 
 .flags { display: flex; flex-wrap: wrap; gap: 5px; }
 .flag {
@@ -152,20 +251,24 @@ export const PANEL_STYLES = `
 }
 .flag.danger { background: rgba(220, 68, 68, .14); color: #f87171; }
 .flag.safe   { background: rgba(46, 160, 94, .13); color: #6ee7a0; }
-/* Neutral: true information that is not a safety claim. */
-.flag.neutral { background: #1c2028; color: #a7aebe; }
-
-.warnings { display: grid; gap: 3px; }
-.warning { font-size: 10px; color: #c9a227; display: flex; gap: 5px; }
-.warning::before { content: "!"; font-weight: 700; }
 
 .footer {
   font-size: 9.5px;
   color: #5f6676;
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
   font-variant-numeric: tabular-nums;
 }
+.footer > span:last-child { margin-left: auto; }
+
+/* Quiet, but not hidden: the counts above it are floors, not totals. */
+.caveat {
+  color: #9a7c28;
+  border-bottom: 1px dotted #6b5719;
+  cursor: help;
+}
+.caveat::before { content: "!"; font-weight: 700; margin-right: 3px; }
 
 /* Loading, error and unsupported states share this block. */
 .notice { padding: 4px 0; color: #8b93a5; font-size: 11.5px; }

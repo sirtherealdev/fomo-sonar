@@ -1,0 +1,170 @@
+/*
+ * The explanatory middle of the page — the spec sheet, the three-step
+ * flow, the two-column splits with their screenshots, the permission
+ * listing and the chain tiles.
+ */
+
+/* --- Spec sheet --------------------------------------------------------
+   Hairline rows with a live readout on the right. The section demonstrates
+   the panel's own output rather than describing it in six equal boxes. */
+.spec { border-top: 1px solid var(--line-bright); }
+.spec-head, .spec-row {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr) 210px;
+  gap: 32px; align-items: start;
+}
+.spec-head {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--text-faint);
+  padding: 12px 18px 12px 16px; margin-left: -16px;
+  border-bottom: 1px solid var(--line);
+}
+.spec-head span:last-child { text-align: right; }
+
+.spec-row {
+  padding: 22px 18px 22px 16px; margin-left: -16px;
+  border-bottom: 1px solid var(--line);
+  transition: background .2s, box-shadow .2s;
+}
+.spec-row:hover {
+  background: rgba(251,191,36,.028);
+  box-shadow: inset 2px 0 0 var(--amber);
+}
+
+.spec-key { font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
+.spec-key i {
+  font-style: normal; font-family: var(--mono); font-size: 11.5px;
+  color: var(--amber); letter-spacing: .08em; margin-right: 12px;
+  vertical-align: 2px;
+}
+.spec-def { color: var(--text-dim); font-size: 14.4px; max-width: 56ch; }
+.spec-val { text-align: right; font-family: var(--mono); }
+.spec-val b {
+  display: block; font-size: 19px; font-weight: 500; letter-spacing: -.02em;
+}
+.spec-val b.bad { color: var(--danger); }
+.spec-val b.warn { color: var(--amber); }
+.spec-val span {
+  display: block; margin-top: 5px;
+  font-size: 11.5px; color: var(--text-faint); line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .spec-head { display: none; }
+  .spec-row { grid-template-columns: 1fr; gap: 10px; padding-bottom: 22px; }
+  .spec-val { text-align: left; display: flex; align-items: baseline; gap: 12px; }
+  .spec-val b { font-size: 17px; }
+  .spec-val span { margin-top: 0; }
+}
+
+/* --- Flow: three steps as a sequence, no boxes ------------------------- */
+.flow { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; }
+.flow li { padding: 0 34px; border-left: 1px solid var(--line); position: relative; }
+.flow li:first-child { padding-left: 0; border-left: 0; }
+.flow li:last-child { padding-right: 0; }
+.flow .i {
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: .18em;
+  color: var(--amber); display: block; margin-bottom: 16px;
+}
+.flow .i::after {
+  content: ""; display: block; width: 26px; height: 1px;
+  background: var(--amber-dim); margin-top: 12px;
+}
+.flow h3 { font-size: 16.5px; font-weight: 600; margin-bottom: 10px; letter-spacing: -.012em; }
+.flow p { font-size: 14.3px; color: var(--text-dim); }
+@media (max-width: 900px) {
+  .flow { grid-template-columns: 1fr; gap: 30px; }
+  .flow li { padding: 0 0 0 20px; border-left: 1px solid var(--line); }
+  .flow li:first-child { padding-left: 20px; border-left: 1px solid var(--line); }
+}
+
+/* Shown as a file, because that is what it is — and the line breaks matter. */
+.code {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 8px; overflow: hidden;
+}
+.code .file {
+  display: flex; align-items: center; gap: 8px;
+  padding: 11px 18px; border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,.015);
+  font-family: var(--mono); font-size: 11px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--text-faint);
+}
+.code .file::before {
+  content: ""; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--amber); opacity: .7;
+}
+.code pre {
+  margin: 0; padding: 20px 22px;
+  font-family: var(--mono); font-size: 13px; line-height: 1.85;
+  color: var(--text-dim); overflow-x: auto;
+}
+.code .k { color: var(--amber); }
+.code .s { color: var(--safe); }
+
+.checklist { list-style: none; display: grid; gap: 12px; margin-top: 26px; }
+.checklist li { display: flex; gap: 12px; font-size: 14.6px; color: var(--text-dim); }
+.checklist .no { color: var(--danger); font-weight: 700; flex: none; font-family: var(--mono); }
+
+/* --- Pull quote ---------------------------------------------------------- */
+.aside {
+  margin: 30px auto 0; padding-left: 18px;
+  border-left: 2px solid var(--amber-dim);
+  color: var(--text-dim); max-width: 64ch; font-size: 15px;
+}
+
+/* --- Readout ------------------------------------------------------------
+   The convenience claim, said in numbers rather than adjectives. */
+.readout {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 28px 40px; margin-top: 44px;
+  padding-top: 26px; border-top: 1px solid var(--line-bright);
+}
+.readout b {
+  display: block; font-family: var(--mono); font-weight: 500;
+  font-size: 28px; letter-spacing: -.03em; color: var(--amber); line-height: 1;
+}
+.readout span { display: block; margin-top: 10px; font-size: 13px; color: var(--text-faint); }
+
+/* --- Wide screenshot ----------------------------------------------------
+   A capture of the panel on a real Fomo page, shown at the full width of the
+   shell: the point of it is the context around the panel, and a narrow column
+   would shrink the page behind it to nothing. */
+.wide-shot { position: relative; width: 100%; margin-top: 8px; padding: 22px; }
+.wide-shot::before {
+  content: ""; position: absolute; inset: 0; border-radius: 20px;
+  background: radial-gradient(60% 70% at 22% 45%, rgba(251,191,36,.10), transparent 70%);
+  filter: blur(20px);
+}
+.wide-shot img {
+  display: block; width: 100%; position: relative;
+  border-radius: 10px; border: 1px solid var(--line-bright);
+  box-shadow: 0 30px 70px rgba(0,0,0,.6);
+}
+.wide-shot figcaption {
+  position: relative; margin-top: 16px; text-align: center;
+  font-family: var(--mono); font-size: 11px; color: var(--text-faint);
+  line-height: 1.7; max-width: 62ch; margin-inline: auto;
+}
+
+/* --- Chains -------------------------------------------------------------
+   The list as Fomo's own switcher shows it: a logo, a name, a rule. An orbit
+   diagram with the product at the hub is a picture of nothing — it decorates
+   a claim the reader can check faster by reading seven words.
+*/
+.chain-list { width: 100%; max-width: 420px; margin-inline: auto; }
+.chain-cap {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--text-faint); margin-bottom: 4px;
+}
+.chain-list ul { list-style: none; }
+.chain-list li {
+  display: flex; align-items: center; gap: 14px;
+  padding: 13px 10px 13px 2px;
+  border-bottom: 1px solid var(--line);
+  transition: background .2s, padding-left .2s;
+}
+.chain-list li:hover { background: rgba(255,255,255,.022); padding-left: 10px; }
+.chain-list img { display: block; width: 26px; height: 26px; border-radius: 7px; }
+.chain-list span { font-size: 15px; color: var(--text-dim); }
+.chain-list li:hover span { color: var(--text); }

@@ -1,0 +1,61 @@
+/*
+ * The hero: the render behind, the interactive bubble map on top, the
+ * scrim that keeps the type readable, and the headline itself.
+ */
+
+/* --- Hero ---------------------------------------------------------------
+   The render carries the page; the type sits on it. Full bleed, full height,
+   with a scrim heavy enough that the copy never fights the image. */
+.hero {
+  position: relative; min-height: 100svh;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  overflow: hidden;
+}
+/* The render stays, but only as atmosphere behind the live map — otherwise
+   two bubble maps compete for the same frame. */
+.hero-img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; object-position: 58% 50%;
+  filter: blur(16px) saturate(.85); opacity: .28; transform: scale(1.06);
+  animation: driftIn 2.4s cubic-bezier(.22,1,.36,1) both;
+}
+/* The interactive layer: nodes spring home, the cursor pushes them apart. */
+.hero-canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  display: block; z-index: 1;
+}
+@keyframes driftIn { from { transform: scale(1.14); opacity: 0 } to { transform: scale(1.06); opacity: .28 } }
+.hero-scrim {
+  position: absolute; inset: 0; z-index: 2;
+  background:
+    linear-gradient(180deg, rgba(7,9,12,.72) 0%, rgba(7,9,12,0) 22%, rgba(7,9,12,.35) 68%, var(--bg) 99%),
+    linear-gradient(90deg, rgba(7,9,12,.88) 0%, rgba(7,9,12,.5) 38%, transparent 66%);
+}
+
+/* width:100% because .hero is a column flex container: without it the copy
+   shrinks to its own content and stops lining up with the header and every
+   section below, which all sit on the 1080px shell. */
+.hero-copy {
+  position: relative; z-index: 3; width: 100%;
+  padding-bottom: 50px; padding-top: 140px;
+}
+.hero-copy .label { margin-bottom: 22px; }
+h1 {
+  font-size: clamp(36px, 5.4vw, 68px);
+  line-height: .98; letter-spacing: -.04em; font-weight: 600;
+  margin-bottom: 26px; text-shadow: 0 2px 44px rgba(0,0,0,.65);
+}
+h1 em { font-style: normal; color: var(--amber); }
+.lede { font-size: 17px; color: var(--text-dim); max-width: 50ch; margin-bottom: 32px; }
+.hero-note {
+  margin-top: 20px; font-family: var(--mono);
+  font-size: 12.5px; color: var(--text-faint);
+}
+@media (max-width: 760px) {
+  .hero-img { object-position: 70% 50%; }
+  .hero-copy { padding-top: 180px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-img, .ticker-row { animation: none; }
+}
