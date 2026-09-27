@@ -54,7 +54,7 @@ zero — a token whose launch is unreadable is reported as unknown, not as safe.
 
 The source is public. The permission list is three lines, and you can read it.
 
-It works on every chain Fomo Web supports.
+It covers seven of the chains Fomo Web supports, and the rest are being added.
 
 ---
 
@@ -66,8 +66,12 @@ excessive keywords, quoting exactly this line:
 > Solana, Base, BNB Chain, Ethereum, Monad, Arc and Robinhood Chain.
 
 Seven brand names in a row reads as keyword stuffing to the automated check,
-however factual it is. The description says "every chain Fomo Web supports"
-instead. Name the chains on the website, not in the listing.
+however factual it is. Name the chains on the website, not in the listing.
+
+The replacement used to read "every chain Fomo Web supports", which was not
+true: Fomo lists at least twelve and SONAR reads seven of them. It now says
+"seven of the chains Fomo Web supports" — no brand names, and accurate.
+Update the count here whenever an adapter lands.
 
 ## Permission justifications
 

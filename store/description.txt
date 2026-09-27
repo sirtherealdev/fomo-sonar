@@ -32,4 +32,4 @@ zero — a token whose launch is unreadable is reported as unknown, not as safe.
 
 The source is public. The permission list is three lines, and you can read it.
 
-It works on every chain Fomo Web supports.
+It covers seven of the chains Fomo Web supports, and the rest are being added.
