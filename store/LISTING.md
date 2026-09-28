@@ -54,7 +54,7 @@ zero — a token whose launch is unreadable is reported as unknown, not as safe.
 
 The source is public. The permission list is three lines, and you can read it.
 
-It covers seven of the chains Fomo Web supports, and the rest are being added.
+It covers seven of the chains Fomo Web supports.
 
 ---
 
@@ -71,7 +71,10 @@ however factual it is. Name the chains on the website, not in the listing.
 The replacement used to read "every chain Fomo Web supports", which was not
 true: Fomo lists at least twelve and SONAR reads seven of them. It now says
 "seven of the chains Fomo Web supports" — no brand names, and accurate.
-Update the count here whenever an adapter lands.
+
+Seven is the scope, decided 2026-09-28. An earlier draft added "and the rest
+are being added", which was a promise nobody had committed to; it is gone from
+here and from the site. If that changes, update the count in both places.
 
 ## Permission justifications
 
