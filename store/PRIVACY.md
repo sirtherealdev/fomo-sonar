@@ -32,7 +32,7 @@ collapsed it. That is stored on your own device and is never transmitted.
 One request, to our own backend:
 
 ```
-GET https://sonar-api.phillipk0.workers.dev/analyze/<chain>/<address>
+GET https://sonar-api.sonarscan.workers.dev/analyze/<chain>/<address>
 ```
 
 It carries the chain name and the public token address, and nothing else — no

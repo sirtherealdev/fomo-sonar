@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SONAR — Privacy Policy</title>
+<meta name="description" content="SONAR does not collect, store, sell or share personal information. It reads one thing: the token address.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/base.css?v=16">
+<link rel="stylesheet" href="css/frame.css?v=16">
+<style>
+  /* One column of prose. The site's own tokens, none of its scenery. */
+  .doc { max-width: 720px; margin: 0 auto; padding: 140px 28px 96px; position: relative; z-index: 1; }
+  .doc h1 { font-size: clamp(30px, 4vw, 42px); letter-spacing: -.03em; margin-bottom: 10px; }
+  .doc h2 { font-size: 19px; margin: 44px 0 14px; max-width: none; }
+  .doc p { color: var(--text-dim); margin-bottom: 14px; }
+  .doc ul { margin: 0 0 18px 20px; }
+  .doc li { color: var(--text-dim); margin-bottom: 8px; }
+  .doc pre {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    padding: 16px 18px; overflow-x: auto; margin-bottom: 18px;
+  }
+  .doc code { font-family: var(--mono); font-size: 13px; color: var(--amber); }
+  .doc pre code { color: var(--text-dim); }
+  .doc em { font-style: normal; font-family: var(--mono); font-size: 12.5px; color: var(--text-faint); }
+  .doc a { color: var(--amber); }
+  .back { display: inline-block; margin-top: 40px; color: var(--text-dim); text-decoration: none; font-size: 14px; }
+  .back:hover { color: var(--amber); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="bar">
+    <a class="mark" href="/"><img src="assets/logo.svg?v=2" alt="" width="30" height="30"><span>SONAR</span></a>
+    <nav><a class="nav-cta" href="/#install">Add to Chrome</a></nav>
+  </div>
+</header>
+
+<main class="doc">
+<h1>SONAR — Privacy Policy</h1>
+<p><em>Last updated: 2026-09-25</em></p>
+<p>SONAR does not collect, store, sell or share personal information.</p>
+<h2>What the extension reads</h2>
+<p>One thing: the <strong>token contract address</strong> of the page you are looking at, taken</p>
+<p>from the URL of a Fomo Web token page, or — only if the URL does not carry it —</p>
+<p>from links already visible on that page.</p>
+<p>That address is public information about a token, not about you.</p>
+<h2>What the extension never touches</h2>
+<p>These are constraints on the code, not promises about intent. The extension:</p>
+<ul>
+  <li>never reads cookies, <code>localStorage</code>, <code>sessionStorage</code>, or any Fomo session data</li>
+  <li>never interacts with your wallet, and cannot approve, sign or send anything</li>
+  <li>never clicks, types into, or submits anything on the page</li>
+  <li>never reads pages other than <code>https://fomo.family/*</code> — it is not permitted to</li>
+  <li>contains no analytics, no tracking, no advertising identifiers</li>
+  <li>loads no remote code and uses no <code>eval</code></li>
+</ul>
+<p>The extension requests a single Chrome permission, <code>storage</code>, and uses it for</p>
+<p>exactly one thing: remembering where you dragged the panel and whether you</p>
+<p>collapsed it. That is stored on your own device and is never transmitted.</p>
+<h2>What is sent over the network</h2>
+<p>One request, to our own backend:</p>
+<pre><code>
+GET https://sonar-api.sonarscan.workers.dev/analyze/&lt;chain&gt;/&lt;address&gt;
+</code></pre>
+<p>It carries the chain name and the public token address, and nothing else — no</p>
+<p>cookies, no credentials, no identifiers, no wallet address, no page contents.</p>
+<p>The request is made with <code>credentials: &#x27;omit&#x27;</code>.</p>
+<p>Our backend forwards that address to public blockchain data providers</p>
+<p>(Helius for Solana, Alchemy for EVM chains, DexScreener for market data) to</p>
+<p>read public on-chain information about the token. It stores the analysis</p>
+<p>result, keyed by token address, so that the next person to look at the same</p>
+<p>token gets an answer faster. Nothing in that cache identifies a person.</p>
+<p>Our server logs contain what any web server&#x27;s logs contain — an IP address and</p>
+<p>the requested path — and are used only to keep the service running and to stop</p>
+<p>abuse. They are not used to build profiles and are not shared.</p>
+<h2>Your data rights</h2>
+<p>We hold no personal data about you, so there is nothing to export or delete.</p>
+<p>Removing the extension removes the panel position stored on your device.</p>
+<h2>Changes</h2>
+<p>If this policy changes, the updated version will be published here and the</p>
+<p>&quot;last updated&quot; date above will change.</p>
+<h2>Contact</h2>
+<p>Open an issue on the project repository.</p>
+  <a class="back" href="/">← Back to sonar</a>
+</main>
+
+</body>
+</html>
