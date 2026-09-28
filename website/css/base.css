@@ -115,6 +115,18 @@ code { font-family: var(--mono); font-size: .92em; }
 }
 .label .on { color: var(--amber); }
 
+/* The dot is a status light, so it breathes rather than flashes: a hard blink
+   reads as an error, and this is only saying the thing is running. */
+.label .live {
+  display: inline-block;
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 1;   text-shadow: 0 0 8px rgba(251,191,36,.75); }
+  50%      { opacity: .32; text-shadow: 0 0 2px rgba(251,191,36,.25); }
+}
+@media (prefers-reduced-motion: reduce) { .label .live { animation: none; } }
+
 .cta-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .btn {
   display: inline-flex; align-items: center; gap: 9px;
