@@ -260,11 +260,15 @@ const TOKEN = {
 Nothing else needs editing — the copy button and the explorer link are wired
 from those two values.
 
-Two decisions worth keeping. There is no placeholder address and no "coming
-soon": either would give an impersonator a screenshot to edit and pass off as
-ours. And the address prints in full rather than truncated, because the middle
-is exactly where a fake address differs and a reader cannot compare what a
-shortened form hides.
+Until then the block stands and says there is no token. That is not a
+placeholder address and not a "coming soon": a plausible-looking string here
+is something anyone could screenshot, edit and pass off as ours, whereas a
+flat denial is what a reader can check a stranger's link against — and on
+launch day the same sentence becomes the confirmation.
+
+The address prints in full rather than truncated, because the middle is
+exactly where a fake differs and nobody can compare what a shortened form
+hides.
 
 ### Screenshots of the panel
 

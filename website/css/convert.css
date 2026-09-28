@@ -202,3 +202,11 @@
   .ca { gap: 14px; }
   .ca-copy { flex: 1 1 auto; }
 }
+
+/* Before launch: the slot is there, visibly empty, and says so. Muted rather
+   than styled like a value, so it can never be mistaken for one. */
+.pending .ca { background: var(--surface); border-style: dashed; }
+.pending .ca-value {
+  font-family: var(--sans); color: var(--text-faint);
+  font-size: 14.5px; word-break: normal;
+}
