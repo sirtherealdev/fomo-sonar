@@ -159,3 +159,46 @@
   .install { grid-template-columns: 1fr; gap: 28px; padding: 30px 24px; }
   .install h3 { max-width: none; }
 }
+
+/* --- Contract address ----------------------------------------------------
+   Printed in full, never truncated: the middle of an address is precisely
+   where an impersonator's differs, and a reader cannot compare what a
+   shortened form hides. Wraps on narrow screens rather than scrolling, so
+   the whole thing is always visible at once. */
+.ca {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 12px;
+  width: 100%; padding: 18px 20px;
+  border: 1px solid var(--line-bright); border-radius: 10px;
+  background:
+    radial-gradient(90% 140% at 0% 0%, rgba(251,191,36,.05), transparent 60%),
+    var(--surface);
+}
+.ca-value {
+  flex: 1 1 340px; min-width: 0;
+  font-family: var(--mono); font-size: 14.5px; color: var(--text);
+  word-break: break-all; line-height: 1.5;
+}
+.ca-copy {
+  flex: none; cursor: pointer;
+  font: inherit; font-size: 13.5px; font-weight: 600;
+  padding: 9px 18px; border-radius: 6px;
+  border: 0; background: var(--amber); color: #0a0b0e;
+  transition: background .2s;
+}
+.ca-copy:hover { background: #fdd34f; }
+.ca-copy.done { background: var(--safe); }
+.ca-explorer {
+  flex: none; font-size: 13.5px; color: var(--text-dim); text-decoration: none;
+  border-bottom: 1px dotted var(--line-bright); padding-bottom: 1px;
+}
+.ca-explorer:hover { color: var(--amber); }
+
+.ca-note {
+  width: 100%; margin-top: 18px; text-align: center;
+  font-size: 13.5px; color: var(--text-faint); max-width: 62ch; margin-inline: auto;
+}
+
+@media (max-width: 560px) {
+  .ca { gap: 14px; }
+  .ca-copy { flex: 1 1 auto; }
+}

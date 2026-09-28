@@ -242,6 +242,30 @@ npx wrangler pages deploy website --project-name=sonar-site --commit-dirty=true
 
 Live at https://sonar-site-3zh.pages.dev.
 
+### Launching the token
+
+The contract address block is built and styled but absent from the page:
+`website/token.js` holds a single `TOKEN` object whose `address` is `null`,
+and while it is null the section removes itself from the document.
+
+To launch, set the two fields and deploy:
+
+```js
+const TOKEN = {
+  address: '<the mint or contract address>',
+  chain: 'solana',   // solana | base | bsc | ethereum | monad | arc | robinhood
+};
+```
+
+Nothing else needs editing — the copy button and the explorer link are wired
+from those two values.
+
+Two decisions worth keeping. There is no placeholder address and no "coming
+soon": either would give an impersonator a screenshot to edit and pass off as
+ours. And the address prints in full rather than truncated, because the middle
+is exactly where a fake address differs and a reader cannot compare what a
+shortened form hides.
+
 ### Screenshots of the panel
 
 `assets/panel-on-fomo.jpg` is a real capture of the panel on a real Fomo token

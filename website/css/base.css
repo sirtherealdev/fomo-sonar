@@ -186,6 +186,7 @@ section > .shell:not(.split) > .flow,
 section > .shell:not(.split) > .chain-grid,
 section > .shell:not(.split) > .readout,
 section > .shell:not(.split) > .install,
+section > .shell:not(.split) > .ca,
 section > .shell:not(.split) > .aside,
 section > .shell:not(.split) > .wide-shot,
 section > .shell:not(.split) > .vs-note { width: 100%; text-align: left; }
