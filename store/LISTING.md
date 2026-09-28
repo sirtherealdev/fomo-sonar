@@ -1,6 +1,6 @@
 # Chrome Web Store listing copy
 
-Everything here is text; the icons and screenshots are the only parts waiting
+Everything here is text; the icons are the only part waiting
 on the visual design.
 
 ---
@@ -103,21 +103,25 @@ data about that token.
 
 ## Screenshots
 
-Three, 1280x800, in `store/screenshots/`. Each shows a different thing the
-panel is for, rather than three views of the same report:
+Two, 1280x800, in `store/screenshots/`:
 
-| file | shows |
-| --- | --- |
-| `risky.png` | a bundled launch — the signals, the funding clusters behind them, and a seizure delegate |
-| `clean.png` | concentration with pools excluded, and a launch with nothing to flag |
-| `unknown.png` | a token whose launch cannot be read, reported as unknown rather than as safe |
+  * `01-on-the-page.jpg` — the whole Fomo token page with the panel open on it,
+    which is the thing being sold: an overlay, not another tab.
+  * `02-the-panel.jpg` — the panel itself, close enough to read every row.
 
-They use illustrative token data, not a verdict on any real token. Regenerate
-with `extension/.preview/shot.html` after the visual design lands.
+Both are crops of one real capture, not mock-ups. The earlier three were
+rendered illustrations, and an illustration cannot sit under a description
+claiming the panel reads the launch transaction — it shows nothing of the kind.
+
+Identifying details are pixelated with `scripts/redact.py`: the account's
+picture, balances and positions, other traders' and clans' names, the token's
+own name, and the holder addresses. No figure is altered. A real ticker beside
+a HIGH dial would be a public accusation about somebody's project, which is
+not ours to make in a Store listing.
 
 ## Assets still needed
 
 - [ ] Final icon set (16, 32, 48, 128 px) — placeholders in `extension/public/icon`
-- [ ] Screenshots reshot on the final design
+- [x] Screenshots reshot on the final design (real capture, 2026-09-28)
 - [ ] Optional promotional tile, 440x280
 - [ ] Privacy policy hosted at a public URL — text in `store/PRIVACY.md`
