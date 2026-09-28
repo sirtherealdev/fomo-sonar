@@ -121,7 +121,7 @@ not ours to make in a Store listing.
 
 ## Assets still needed
 
-- [ ] Final icon set (16, 32, 48, 128 px) — placeholders in `extension/public/icon`
+- [x] Icon set (16, 32, 48, 128 px) — the logo mark, generated in the commit that added it
 - [x] Screenshots reshot on the final design (real capture, 2026-09-28)
 - [ ] Optional promotional tile, 440x280
-- [ ] Privacy policy hosted at a public URL — text in `store/PRIVACY.md`
+- [x] Privacy policy at https://sonar-site-3zh.pages.dev/privacy (source: `store/PRIVACY.md`)
