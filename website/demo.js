@@ -78,7 +78,7 @@
   const STEPS = [
     { at: 1, t: 1000, ms: 420 },
     { at: 2, t: 2400, ms: 1640 },
-    { at: 3, t: 3900, ms: 3010 },
+    { at: 3, t: 3900, ms: 5410 },
   ];
 
   const $ = sel => panel.querySelector(sel);
@@ -206,7 +206,7 @@
       // No sequence: show the finished panel, which is the useful state.
       rows.forEach(r => r.classList.add('in'));
       panel.querySelectorAll('.p-block').forEach(b => b.classList.add('in'));
-      ms.textContent = '3,010 ms';
+      ms.textContent = '5,410 ms';
       settle(tk);
       num.textContent = String(tk.score);
       return;
