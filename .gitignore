@@ -13,3 +13,5 @@ dist/
 .preview/
 .launch-cache.json
 
+
+.claude/
