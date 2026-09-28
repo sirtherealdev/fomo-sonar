@@ -209,6 +209,59 @@ Two implementation notes that are load-bearing for the trust story:
   are best guesses in `CHAIN_ALIASES` until someone opens a token page on
   those chains.
 
+## Website
+
+The landing page in `website/` is plain HTML, one stylesheet per region of the
+page, and two small scripts. No framework and no build step: what is in the
+folder is what gets served.
+
+```
+website/
+  index.html
+  css/       base · frame · hero · content · panel · convert · backdrops
+  bubbles.js the hero's interactive bubble map
+  demo.js    the panel recreation, cycling three tokens
+  assets/    the hero render, the logo, the chain marks, one real screenshot
+```
+
+Load order is cascade order, so a rule that has to win belongs in a file
+listed later in `index.html`. Stylesheets and scripts carry a `?v=` query;
+bump it when you change one, or browsers will keep serving the old copy.
+
+Run it locally:
+
+```bash
+python3 -m http.server 8900 --directory website
+```
+
+Deploy it:
+
+```bash
+npx wrangler pages deploy website --project-name=sonar-site --commit-dirty=true
+```
+
+Live at https://sonar-site-3zh.pages.dev.
+
+### Screenshots of the panel
+
+`assets/panel-on-fomo.jpg` is a real capture of the panel on a real Fomo token
+page, not a mock-up — a caption claiming the panel answers in seconds cannot
+sit above an illustration.
+
+Identifying details are covered with `scripts/redact.py`, which pixelates
+rather than blurs. A blur strong enough to destroy small text flattens a large
+block into one dead colour, and the reader cannot tell whether anything was
+ever there; a mosaic keeps the colours and shapes, so a redacted leaderboard
+still looks like a leaderboard.
+
+```bash
+python3 scripts/redact.py shot.png --grid 50          # read coordinates off it
+python3 scripts/redact.py shot.png out.png --box 126,100,196,128 --box ...
+```
+
+Nothing in it rewrites a value. Every percentage, score and timing in the
+published image is exactly what the panel printed.
+
 ## Publishing
 
 Everything that does not depend on the visual design is in [`store/`](store):
