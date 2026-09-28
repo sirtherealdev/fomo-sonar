@@ -106,21 +106,23 @@ data about that token.
 
 ## Screenshots
 
-Two, 1280x800, in `store/screenshots/`:
+Three, 1280x800, in `store/screenshots/`:
 
   * `01-on-the-page.jpg` — the whole Fomo token page with the panel open on it,
     which is the thing being sold: an overlay, not another tab.
-  * `02-the-panel.jpg` — the panel itself, close enough to read every row.
+  * `02-the-panel.jpg` — the panel beside the numbers Fomo already prints, close
+    enough to read every row.
+  * `03-over-the-chart.jpg` — the panel sitting over the chart, mid-trade.
 
-Both are crops of one real capture, not mock-ups. The earlier three were
-rendered illustrations, and an illustration cannot sit under a description
-claiming the panel reads the launch transaction — it shows nothing of the kind.
+All three are crops of one real capture, not mock-ups. The set they replaced
+was rendered, and still carried the name SCOPE from before the rename — a
+listing showing a different product name than the one being installed.
 
-Identifying details are pixelated with `scripts/redact.py`: the account's
-picture, balances and positions, other traders' and clans' names, the token's
-own name, and the holder addresses. No figure is altered. A real ticker beside
-a HIGH dial would be a public accusation about somebody's project, which is
-not ours to make in a Store listing.
+Identifying details are pixelated with `scripts/redact.py` at a 14px block,
+and the profile pictures at 40px: the account's balances and positions, other
+traders' and clans' names, the token's own name, and the holder addresses. No
+figure is altered. A real ticker beside a HIGH dial would be a public
+accusation about somebody's project, which is not ours to make in a listing.
 
 ## Assets still needed
 
