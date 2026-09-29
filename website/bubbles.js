@@ -74,11 +74,19 @@
     canvas.height = Math.round(h * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
+    /*
+     * On a phone the copy runs the full width, so a map spread over the whole
+     * hero sits underneath the headline and the two fight. Compressing it into
+     * the upper half puts the picture above the words instead of behind them.
+     */
+    const narrow = w < 760;
+    const squeeze = narrow ? 0.44 : 1;
+
     // Scale radii with the short edge so the map keeps its proportions.
-    const k = Math.min(w / 1440, 1.3) * 1.75;
+    const k = Math.min(w / 1440, 1.3) * 1.75 * (narrow ? 0.8 : 1);
     nodes.forEach(n => {
       n.hx = n.fx * w;
-      n.hy = n.fy * h;
+      n.hy = n.fy * h * squeeze;
       n.rr = n.r * Math.max(k, .58);
       if (!n.x) { n.x = n.hx; n.y = n.hy; }
     });

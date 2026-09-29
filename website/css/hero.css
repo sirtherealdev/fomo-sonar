@@ -52,8 +52,23 @@ h1 em { font-style: normal; color: var(--amber); }
   font-size: 12.5px; color: var(--text-faint);
 }
 @media (max-width: 760px) {
-  .hero-img { object-position: 70% 50%; }
-  .hero-copy { padding-top: 180px; }
+  .hero-img { object-position: 70% 42%; }
+  .hero-copy { padding-top: 150px; }
+  /* The map lives in the top half here; fade it where the copy begins so no
+     node ever sits behind a letter. */
+  .hero-canvas { opacity: .85; mask-image: linear-gradient(180deg, #000 38%, transparent 66%);
+                 -webkit-mask-image: linear-gradient(180deg, #000 38%, transparent 66%); }
+  .hero-scrim {
+    background:
+      linear-gradient(180deg, rgba(7,9,12,.62) 0%, rgba(7,9,12,.1) 18%, rgba(7,9,12,.8) 52%, var(--bg) 96%);
+  }
+}
+
+/* The eyebrow is one line of wide-tracked mono; at phone widths the tracking
+   is what pushes "FOMO WEB" onto a line of its own. */
+@media (max-width: 560px) {
+  .hero-copy .label { font-size: 10px; letter-spacing: .1em; }
+  h1 { font-size: clamp(31px, 8.6vw, 40px); }
 }
 
 @media (prefers-reduced-motion: reduce) {

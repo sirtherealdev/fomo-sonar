@@ -8,12 +8,12 @@
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <!-- One file per region of the page. They are independent, so an edit to one
      cannot reach into another; load order is the cascade order. -->
-<link rel="stylesheet" href="css/base.css?v=19">
-<link rel="stylesheet" href="css/frame.css?v=19">
-<link rel="stylesheet" href="css/hero.css?v=19">
-<link rel="stylesheet" href="css/content.css?v=19">
-<link rel="stylesheet" href="css/panel.css?v=19">
-<link rel="stylesheet" href="css/convert.css?v=19">
+<link rel="stylesheet" href="css/base.css?v=22">
+<link rel="stylesheet" href="css/frame.css?v=22">
+<link rel="stylesheet" href="css/hero.css?v=22">
+<link rel="stylesheet" href="css/content.css?v=22">
+<link rel="stylesheet" href="css/panel.css?v=22">
+<link rel="stylesheet" href="css/convert.css?v=22">
 <link rel="stylesheet" href="css/backdrops.css?v=1">
 </head>
 <body>
@@ -305,8 +305,10 @@
       </p>
 
       <figure class="wide-shot">
-        <img src="assets/panel-on-fomo.jpg?v=2"
-             alt="A Fomo token page with the SONAR panel open over it: a score of 72, bundlers holding 38.3% across 12 wallets, snipers 35.4%, and the top holders listed underneath">
+        <picture>
+          <source media="(max-width: 700px)" srcset="assets/panel-on-fomo-mobile.jpg?v=1">
+          <img src="assets/panel-on-fomo.jpg?v=2"
+             alt="A Fomo token page with the SONAR panel open over it: a score of 72, bundlers holding 38.3% across 12 wallets, snipers 35.4%, and the top holders listed underneath"></picture>
         <figcaption>
           An untouched screenshot of a Fomo token page with the panel open on it.
           Pixelated out: the account's picture, balances and positions, other traders'
@@ -751,7 +753,7 @@
 </script>
 
 <script src="token.js?v=2"></script>
-<script src="bubbles.js?v=2"></script>
+<script src="bubbles.js?v=4"></script>
 <script src="demo.js?v=3"></script>
 
 </body>

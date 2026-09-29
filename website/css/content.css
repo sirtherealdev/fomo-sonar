@@ -168,3 +168,12 @@
 .chain-list img { display: block; width: 26px; height: 26px; border-radius: 7px; }
 .chain-list span { font-size: 15px; color: var(--text-dim); }
 .chain-list li:hover span { color: var(--text); }
+
+@media (max-width: 700px) {
+  /* The frame's padding costs a quarter of the width on a phone, and the shot
+     swaps to a portrait crop of the panel — the full-page version renders
+     275px wide there and nothing in it can be read. */
+  .wide-shot { padding: 0; }
+  .wide-shot::before { inset: -6%; }
+  .wide-shot figcaption { margin-top: 14px; font-size: 10.5px; }
+}
